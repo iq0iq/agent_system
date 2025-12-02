@@ -24,6 +24,18 @@
           "priority": "NORMAL",
           "status": "PENDING"
         }
+      },
+      {
+        "agentId": "CargoAgent3",
+        "cargo": {
+          "id": "C3",
+          "type": "сыпучий",
+          "weight": 40.0,
+          "fromStation": "ST1",
+          "toStation": "ST3",
+          "priority": "LOW",
+          "status": "PENDING"
+        }
       }
     ],
     "wagon": [
@@ -47,6 +59,17 @@
           "currentStation": "ST2",
           "available": true,
           "compatibleCargoTypes": ["жидкий", "газ"]
+        }
+      },
+      {
+        "agentId": "WagonAgent3",
+        "wagon": {
+          "id": "W3",
+          "type": "сыпучий",
+          "capacity": 80.0,
+          "currentStation": "ST1",
+          "available": true,
+          "compatibleCargoTypes": ["сыпучий", "насыпной"]
         }
       }
     ],
@@ -72,49 +95,64 @@
           "maxWeightCapacity": 150.0,
           "available": true
         }
+      },
+      {
+        "agentId": "LocomotiveAgent3",
+        "locomotive": {
+          "id": "L3",
+          "type": "электровоз",
+          "power": 6000.0,
+          "currentStation": "ST1",
+          "maxWeightCapacity": 250.0,
+          "available": true
+        }
       }
     ],
     "road": [
       {
         "agentId": "RoadAgent1",
-        "stations": [
-          {
-            "id": "ST1",
-            "name": "Москва",
-            "location": "Москва",
-            "capacity": 100
-          },
-          {
-            "id": "ST2",
-            "name": "Санкт-Петербург",
-            "location": "СПб",
-            "capacity": 80
-          },
-          {
-            "id": "ST3",
-            "name": "Нижний Новгород",
-            "location": "НН",
-            "capacity": 60
-          }
-        ]
+        "route": {
+          "fromStation": "ST1",
+          "toStation": "ST2",
+          "distance": 650.0
+        }
+      },
+      {
+        "agentId": "RoadAgent2",
+        "route": {
+          "fromStation": "ST2",
+          "toStation": "ST3",
+          "distance": 400.0
+        }
+      },
+      {
+        "agentId": "RoadAgent3",
+        "route": {
+          "fromStation": "ST1",
+          "toStation": "ST3",
+          "distance": 420.0
+        }
       }
     ]
   },
-  "routes": [
+  "stations": [
     {
-      "fromStation": "ST1",
-      "toStation": "ST2",
-      "distance": 650.0
+      "id": "ST1",
+      "name": "Москва",
+      "location": "Москва",
+      "capacity": 100
     },
     {
-      "fromStation": "ST2",
-      "toStation": "ST3",
-      "distance": 400.0
+      "id": "ST2",
+      "name": "Санкт-Петербург",
+      "location": "СПб",
+      "capacity": 80
     },
     {
-      "fromStation": "ST1",
-      "toStation": "ST3",
-      "distance": 420.0
+      "id": "ST3",
+      "name": "Нижний Новгород",
+      "location": "НН",
+      "capacity": 60
     }
   ]
 }

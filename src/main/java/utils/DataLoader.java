@@ -59,6 +59,17 @@ public class DataLoader {
         return null;
     }
 
+    public static Route getRouteForRoadAgent(String agentId) {
+        var roadAgents = data.getAsJsonObject("agents").getAsJsonArray("road");
+        for (var agent : roadAgents) {
+            JsonObject agentObj = agent.getAsJsonObject();
+            if (agentObj.get("agentId").getAsString().equals(agentId)) {
+                return gson.fromJson(agentObj.get("route"), Route.class);
+            }
+        }
+        return null;
+    }
+
     public static List<Route> getAllRoutes() {
         List<Route> routes = new ArrayList<>();
         var routesArray = data.getAsJsonArray("routes");
@@ -93,19 +104,18 @@ public class DataLoader {
         return ids;
     }
 
-    public static List<Station> getStationsForRoadAgent(String agentId) {
-        List<Station> stations = new ArrayList<>();
+    public static Station getStationById(String stationId) {
         var roadAgents = data.getAsJsonObject("agents").getAsJsonArray("road");
         for (var agent : roadAgents) {
             JsonObject agentObj = agent.getAsJsonObject();
-            if (agentObj.get("agentId").getAsString().equals(agentId)) {
-                var stationsArray = agentObj.getAsJsonArray("stations");
-                for (var station : stationsArray) {
-                    stations.add(gson.fromJson(station, Station.class));
+            var stationsArray = agentObj.getAsJsonArray("stations");
+            for (var station : stationsArray) {
+                JsonObject stationObj = station.getAsJsonObject();
+                if (stationObj.get("id").getAsString().equals(stationId)) {
+                    return gson.fromJson(stationObj, Station.class);
                 }
-                break;
             }
         }
-        return stations;
+        return null;
     }
 }
