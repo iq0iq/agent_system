@@ -1,0 +1,120 @@
+{
+  "agents": {
+    "cargo": [
+      {
+        "agentId": "CargoAgent1",
+        "cargo": {
+          "id": "C1",
+          "type": "сыпучий",
+          "weight": 50.0,
+          "fromStation": "ST1",
+          "toStation": "ST2",
+          "priority": "HIGH",
+          "status": "PENDING"
+        }
+      },
+      {
+        "agentId": "CargoAgent2",
+        "cargo": {
+          "id": "C2",
+          "type": "жидкий",
+          "weight": 30.0,
+          "fromStation": "ST2",
+          "toStation": "ST3",
+          "priority": "NORMAL",
+          "status": "PENDING"
+        }
+      }
+    ],
+    "wagon": [
+      {
+        "agentId": "WagonAgent1",
+        "wagon": {
+          "id": "W1",
+          "type": "сыпучий",
+          "capacity": 60.0,
+          "currentStation": "ST1",
+          "available": true,
+          "compatibleCargoTypes": ["сыпучий", "насыпной"]
+        }
+      },
+      {
+        "agentId": "WagonAgent2",
+        "wagon": {
+          "id": "W2",
+          "type": "цистерна",
+          "capacity": 40.0,
+          "currentStation": "ST2",
+          "available": true,
+          "compatibleCargoTypes": ["жидкий", "газ"]
+        }
+      }
+    ],
+    "locomotive": [
+      {
+        "agentId": "LocomotiveAgent1",
+        "locomotive": {
+          "id": "L1",
+          "type": "электровоз",
+          "power": 5000.0,
+          "currentStation": "ST1",
+          "maxWeightCapacity": 200.0,
+          "available": true
+        }
+      },
+      {
+        "agentId": "LocomotiveAgent2",
+        "locomotive": {
+          "id": "L2",
+          "type": "тепловоз",
+          "power": 4000.0,
+          "currentStation": "ST2",
+          "maxWeightCapacity": 150.0,
+          "available": true
+        }
+      }
+    ],
+    "road": [
+      {
+        "agentId": "RoadAgent1",
+        "stations": [
+          {
+            "id": "ST1",
+            "name": "Москва",
+            "location": "Москва",
+            "capacity": 100
+          },
+          {
+            "id": "ST2",
+            "name": "Санкт-Петербург",
+            "location": "СПб",
+            "capacity": 80
+          },
+          {
+            "id": "ST3",
+            "name": "Нижний Новгород",
+            "location": "НН",
+            "capacity": 60
+          }
+        ]
+      }
+    ]
+  },
+  "routes": [
+    {
+      "fromStation": "ST1",
+      "toStation": "ST2",
+      "distance": 650.0
+    },
+    {
+      "fromStation": "ST2",
+      "toStation": "ST3",
+      "distance": 400.0
+    },
+    {
+      "fromStation": "ST1",
+      "toStation": "ST3",
+      "distance": 420.0
+    }
+  ]
+}

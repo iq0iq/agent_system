@@ -1,0 +1,32 @@
+{
+  "toStation": "ST3",
+  "locomotiveId": "L2",
+  "distance": 400.0,
+  "cargoIds": [
+    "C2"
+  ],
+  "creationTime": "Dec 2, 2025, 5:37:55 PM",
+  "totalWeight": 30.0,
+  "confirmedBy": "CargoAgent2",
+  "confirmationTime": "Dec 2, 2025, 5:37:55 PM",
+  "wagonId": "W2",
+  "scheduleId": "SCHEDULE_7F12CA71",
+  "fromStation": "ST2",
+  "status": "CONFIRMED"
+},
+{
+  "toStation": "ST2",
+  "locomotiveId": "L1",
+  "distance": 650.0,
+  "cargoIds": [
+    "C1"
+  ],
+  "creationTime": "Dec 2, 2025, 5:37:55 PM",
+  "totalWeight": 50.0,
+  "confirmedBy": "CargoAgent2",
+  "confirmationTime": "Dec 2, 2025, 5:37:55 PM",
+  "wagonId": "W1",
+  "scheduleId": "SCHEDULE_3BA61950",
+  "fromStation": "ST1",
+  "status": "CONFIRMED"
+},
