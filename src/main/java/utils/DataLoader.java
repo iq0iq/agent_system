@@ -5,11 +5,13 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import models.*;
 import java.io.*;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class DataLoader {
     private static final Gson gson = new Gson();
     private static JsonObject data;
+    private static Date simulationStartTime;
 
     static {
         try {
@@ -21,9 +23,17 @@ public class DataLoader {
             Reader reader = new InputStreamReader(inputStream);
             data = JsonParser.parseReader(reader).getAsJsonObject();
             reader.close();
+
+            // Загружаем время начала симуляции
+            String timeStr = data.get("simulationStartTime").getAsString();
+            simulationStartTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(timeStr);
         } catch (Exception e) {
             throw new RuntimeException("Failed to load data: " + e.getMessage());
         }
+    }
+
+    public static Date getSimulationStartTime() {
+        return simulationStartTime;
     }
 
     public static Cargo getCargoForAgent(String agentId) {
@@ -105,15 +115,11 @@ public class DataLoader {
     }
 
     public static Station getStationById(String stationId) {
-        var roadAgents = data.getAsJsonObject("agents").getAsJsonArray("road");
-        for (var agent : roadAgents) {
-            JsonObject agentObj = agent.getAsJsonObject();
-            var stationsArray = agentObj.getAsJsonArray("stations");
-            for (var station : stationsArray) {
-                JsonObject stationObj = station.getAsJsonObject();
-                if (stationObj.get("id").getAsString().equals(stationId)) {
-                    return gson.fromJson(stationObj, Station.class);
-                }
+        var stationsArray = data.getAsJsonArray("stations");
+        for (var station : stationsArray) {
+            JsonObject stationObj = station.getAsJsonObject();
+            if (stationObj.get("id").getAsString().equals(stationId)) {
+                return gson.fromJson(stationObj, Station.class);
             }
         }
         return null;

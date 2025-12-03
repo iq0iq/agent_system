@@ -19,35 +19,33 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class RoadAgent extends Agent {
     private String agentId;
     private Route route;
     private ScheduleData scheduleData;
     private Gson gson = new GsonBuilder().setPrettyPrinting().create();
-    private Map<String, Map<String, Object>> confirmedSchedules = new ConcurrentHashMap<>();
 
     private class LocomotiveRequest {
         String cargoId;
         String fromStation;
         String toStation;
-        double weight;
+        double totalWeight;
         String locomotiveId;
-        String wagonId;
-        String priority;
+        String wagonIds;
+        Date trainAvailableTime; // Свободное время поезда (локомотива)
         ACLMessage originalMessage;
 
         LocomotiveRequest(String cargoId, String fromStation, String toStation,
-                          double weight, String locomotiveId, String wagonId,
-                          String priority, ACLMessage originalMessage) {
+                          double totalWeight, String locomotiveId, String wagonIds,
+                          Date trainAvailableTime, ACLMessage originalMessage) {
             this.cargoId = cargoId;
             this.fromStation = fromStation;
             this.toStation = toStation;
-            this.weight = weight;
+            this.totalWeight = totalWeight;
             this.locomotiveId = locomotiveId;
-            this.wagonId = wagonId;
-            this.priority = priority;
+            this.wagonIds = wagonIds;
+            this.trainAvailableTime = trainAvailableTime;
             this.originalMessage = originalMessage;
         }
     }
@@ -77,15 +75,13 @@ public class RoadAgent extends Agent {
         } catch (FIPAException e) {}
 
         addBehaviour(new LocomotiveRequestBehaviour());
-        addBehaviour(new BookingConfirmationBehaviour());
-        addBehaviour(new FinalConfirmationBehaviour());
+        addBehaviour(new AcceptProposalBehaviour());
         System.out.println(agentId + " started for route: " + route.getFromStation() +
-                " -> " + route.getToStation() + " (" + route.getDistance() + " km)");
+                " -> " + route.getToStation() + ", schedule size: " + scheduleData.getSchedule().size());
     }
 
     private class LocomotiveRequestBehaviour extends CyclicBehaviour {
         public void action() {
-            // Ждем запросы от локомотивов
             MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.CFP);
             ACLMessage msg = myAgent.receive(mt);
 
@@ -104,18 +100,16 @@ public class RoadAgent extends Agent {
             String cargoId = parts[0];
             String fromStation = parts[1];
             String toStation = parts[2];
-            double weight = Double.parseDouble(parts[3]);
+            double totalWeight = Double.parseDouble(parts[3]);
             String locomotiveId = parts[4];
-            String wagonId = parts[5];
-            String priority = parts[6];
+            String wagonIds = parts[5];
+            Date trainAvailableTime = new Date(Long.parseLong(parts[6]));
 
-            currentRequest = new LocomotiveRequest(cargoId, fromStation, toStation, weight,
-                    locomotiveId, wagonId, priority, msg);
+            currentRequest = new LocomotiveRequest(cargoId, fromStation, toStation, totalWeight,
+                    locomotiveId, wagonIds, trainAvailableTime, msg);
 
-            // Проверяем, подходит ли наш маршрут
             if (!route.getFromStation().equals(fromStation) || !route.getToStation().equals(toStation)) {
-                System.out.println(agentId + ": Route mismatch. Our: " + route.getFromStation() +
-                        "->" + route.getToStation() + ", Requested: " + fromStation + "->" + toStation);
+                System.out.println(agentId + ": Route mismatch");
                 ACLMessage reply = msg.createReply();
                 reply.setPerformative(ACLMessage.REFUSE);
                 reply.setContent("ROUTE_MISMATCH");
@@ -124,137 +118,118 @@ public class RoadAgent extends Agent {
                 return;
             }
 
-            // Рассчитываем продолжительность поездки
             int tripDuration = TimeUtils.calculateTripDuration(route.getDistance());
 
-            // Находим доступное время
-            Date availableTime = scheduleData.findNearestAvailableTime(tripDuration);
+            // Используем свободное время поезда для поиска ближайшего доступного времени
+            Date availableTime = scheduleData.findNearestAvailableTimeAfter(trainAvailableTime, tripDuration);
 
-            // Рассчитываем стоимость
-            double baseCost = route.getDistance() * 10.0; // 10 за км
-
-            // Учитываем приоритет (HIGH приоритет дороже)
-            double priorityMultiplier = 1.0;
-            if ("HIGH".equals(priority)) {
-                priorityMultiplier = 1.5;
-            } else if ("LOW".equals(priority)) {
-                priorityMultiplier = 0.8;
-            }
-
-            double totalCost = baseCost * priorityMultiplier;
-
-            // Отправляем предложение локомотиву
             ACLMessage reply = currentRequest.originalMessage.createReply();
             reply.setPerformative(ACLMessage.PROPOSE);
-            reply.setContent(availableTime.getTime() + ":" + totalCost + ":" +
+            reply.setContent(availableTime.getTime() + ":" +
                     "ROUTE_" + fromStation + "_" + toStation);
             myAgent.send(reply);
 
             System.out.println(agentId + ": Sent proposal to " + msg.getSender().getLocalName() +
-                    " - time: " + availableTime + ", cost: " + totalCost +
+                    " - requested time: " + trainAvailableTime +
+                    ", available time: " + availableTime +
                     ", duration: " + tripDuration + " min");
-
-            // Сбрасываем текущий запрос, так как ответ отправлен
-            currentRequest = null;
         }
     }
 
-    private class BookingConfirmationBehaviour extends CyclicBehaviour {
+    private class AcceptProposalBehaviour extends CyclicBehaviour {
         public void action() {
             MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.ACCEPT_PROPOSAL);
             ACLMessage msg = myAgent.receive(mt);
 
-            if (msg != null) {
-                // Получили подтверждение от локомотива
+            if (msg != null && currentRequest != null) {
                 String content = msg.getContent();
                 if (content.startsWith("ACCEPT_PROPOSAL:")) {
-                    String cargoId = content.substring("ACCEPT_PROPOSAL:".length());
+                    String[] parts = content.substring("ACCEPT_PROPOSAL:".length()).split(":");
+                    String cargoId = parts[0];
+                    String toStation = parts[1];
 
-                    // Создаем расписание
-                    String scheduleId = "SCHEDULE_" + System.currentTimeMillis();
+                    if (currentRequest.cargoId.equals(cargoId)) {
+                        int tripDuration = TimeUtils.calculateTripDuration(route.getDistance());
 
-                    // Рассчитываем время поездки (на основе предложения, которое мы отправили ранее)
-                    // Для простоты будем считать, что поездка начнется через 1 час
-                    int tripDuration = TimeUtils.calculateTripDuration(route.getDistance());
-                    Date startTime = TimeUtils.addMinutes(new Date(), 60);
-                    Date endTime = TimeUtils.addMinutes(startTime, tripDuration);
+                        // Находим ближайшее доступное время после времени готовности поезда
+                        Date departureTime = scheduleData.findNearestAvailableTimeAfter(
+                                currentRequest.trainAvailableTime, tripDuration);
+                        Date arrivalTime = TimeUtils.addMinutes(departureTime, tripDuration);
 
-                    // Резервируем время в расписании
-                    scheduleData.reserveTimeSlot(startTime, endTime);
+                        scheduleData.reserveTimeSlot(departureTime, arrivalTime);
 
-                    // Создаем и сохраняем расписание
-                    createSchedule(scheduleId, cargoId, startTime, endTime);
+                        String scheduleId = "SCHEDULE_" + System.currentTimeMillis() + "_" +
+                                currentRequest.locomotiveId;
+                        createSchedule(scheduleId, departureTime, arrivalTime, tripDuration);
 
-                    System.out.println(agentId + ": Schedule created: " + scheduleId +
-                            " for cargo: " + cargoId);
+                        System.out.println(agentId + ": Schedule created: " + scheduleId +
+                                " for locomotive: " + currentRequest.locomotiveId +
+                                ", requested time: " + currentRequest.trainAvailableTime +
+                                ", departure: " + departureTime +
+                                ", arrival: " + arrivalTime);
 
-                    // Уведомляем локомотив о создании расписания
-                    ACLMessage confirmMsg = new ACLMessage(ACLMessage.CONFIRM);
-                    confirmMsg.addReceiver(msg.getSender());
-                    confirmMsg.setContent("SCHEDULE_CREATED:" + scheduleId);
-                    myAgent.send(confirmMsg);
+                        ACLMessage confirmMsg = new ACLMessage(ACLMessage.INFORM);
+                        confirmMsg.addReceiver(msg.getSender());
+                        confirmMsg.setContent("SCHEDULE_CREATED:" + scheduleId + ":" +
+                                departureTime.getTime() + ":" + arrivalTime.getTime());
+                        myAgent.send(confirmMsg);
+
+                        currentRequest = null;
+                    }
                 }
             } else {
                 block();
             }
         }
 
-        private void createSchedule(String scheduleId, String cargoId, Date startTime, Date endTime) {
+        private void createSchedule(String scheduleId, Date departureTime, Date arrivalTime, int tripDuration) {
             Map<String, Object> scheduleData = new HashMap<>();
             scheduleData.put("scheduleId", scheduleId);
-            scheduleData.put("routeId", "ROUTE_" + route.getFromStation() + "_" + route.getToStation());
             scheduleData.put("fromStation", route.getFromStation());
             scheduleData.put("toStation", route.getToStation());
             scheduleData.put("distance", route.getDistance());
-            scheduleData.put("cargoId", cargoId);
-            scheduleData.put("startTime", startTime);
-            scheduleData.put("endTime", endTime);
-            scheduleData.put("duration", (endTime.getTime() - startTime.getTime()) / 60000 + " min");
-            scheduleData.put("status", "CONFIRMED");
+            scheduleData.put("cargoId", currentRequest.cargoId);
+            scheduleData.put("wagonIds", currentRequest.wagonIds);
+            scheduleData.put("locomotiveId", currentRequest.locomotiveId);
+            scheduleData.put("totalWeight", currentRequest.totalWeight);
+            scheduleData.put("trainAvailableTime", currentRequest.trainAvailableTime);
+            scheduleData.put("departureTime", departureTime);
+            scheduleData.put("arrivalTime", arrivalTime);
+            scheduleData.put("duration", tripDuration + " min");
             scheduleData.put("creationTime", new Date());
 
-            confirmedSchedules.put(scheduleId, scheduleData);
             saveScheduleToFile(scheduleData);
         }
 
         private void saveScheduleToFile(Map<String, Object> scheduleData) {
             try {
                 String filename = "schedules.json";
+                boolean fileExists = new java.io.File(filename).exists();
+
                 try (FileWriter writer = new FileWriter(filename, true)) {
+                    if (!fileExists) {
+                        writer.write("[\n");
+                    } else {
+                        writer.write(",\n");
+                    }
                     gson.toJson(scheduleData, writer);
-                    writer.write(",\n");
+                    writer.write("\n]");
                 }
 
                 System.out.println("=== SCHEDULE SAVED ===");
                 System.out.println("Schedule ID: " + scheduleData.get("scheduleId"));
                 System.out.println("Route: " + scheduleData.get("fromStation") + " -> " +
                         scheduleData.get("toStation"));
-                System.out.println("Distance: " + scheduleData.get("distance") + " km");
-                System.out.println("Cargo ID: " + scheduleData.get("cargoId"));
-                System.out.println("Time: " + scheduleData.get("startTime") + " to " +
-                        scheduleData.get("endTime"));
-                System.out.println("Duration: " + scheduleData.get("duration"));
+                System.out.println("Cargo: " + scheduleData.get("cargoId"));
+                System.out.println("Wagons: " + scheduleData.get("wagonIds"));
+                System.out.println("Locomotive: " + scheduleData.get("locomotiveId"));
+                System.out.println("Train available at: " + scheduleData.get("trainAvailableTime"));
+                System.out.println("Departure: " + scheduleData.get("departureTime"));
+                System.out.println("Arrival: " + scheduleData.get("arrivalTime"));
                 System.out.println("======================");
 
             } catch (IOException e) {
                 System.err.println(agentId + ": Error saving schedule: " + e.getMessage());
-            }
-        }
-    }
-
-    private class FinalConfirmationBehaviour extends CyclicBehaviour {
-        public void action() {
-            MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.INFORM);
-            ACLMessage msg = myAgent.receive(mt);
-
-            if (msg != null) {
-                String content = msg.getContent();
-                if (content.startsWith("SCHEDULE_FINALIZED:")) {
-                    String scheduleId = content.substring("SCHEDULE_FINALIZED:".length());
-                    System.out.println(agentId + ": Schedule finalized: " + scheduleId);
-                }
-            } else {
-                block();
             }
         }
     }

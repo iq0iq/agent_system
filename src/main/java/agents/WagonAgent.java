@@ -25,27 +25,27 @@ public class WagonAgent extends Agent {
     private int expectedLocomotiveResponses = 0;
     private Proposal bestLocomotiveProposal = null;
     private String currentCargoId = null;
+    private String currentCargoToStation = null;
     private long startTime;
 
-    // Храним информацию о текущем запросе
     private class CargoRequest {
         String cargoId;
         String cargoType;
         double weight;
         String fromStation;
         String toStation;
-        String priority;
+        Date wagonAvailableTime; // Свободное время вагона
         ACLMessage originalMessage;
 
         CargoRequest(String cargoId, String cargoType, double weight,
-                     String fromStation, String toStation, String priority,
-                     ACLMessage originalMessage) {
+                     String fromStation, String toStation,
+                     Date wagonAvailableTime, ACLMessage originalMessage) {
             this.cargoId = cargoId;
             this.cargoType = cargoType;
             this.weight = weight;
             this.fromStation = fromStation;
             this.toStation = toStation;
-            this.priority = priority;
+            this.wagonAvailableTime = wagonAvailableTime;
             this.originalMessage = originalMessage;
         }
     }
@@ -75,19 +75,20 @@ public class WagonAgent extends Agent {
         } catch (FIPAException e) {}
 
         addBehaviour(new CargoRequestBehaviour());
-        addBehaviour(new WaitForLocomotiveResponsesBehaviour());
-        addBehaviour(new BookingConfirmationBehaviour());
-        addBehaviour(new ScheduleFinalizationBehaviour());
-        System.out.println(agentId + " started with wagon: " + wagon.getId());
+//        addBehaviour(new WaitForLocomotiveResponsesBehaviour());
+//        addBehaviour(new AcceptProposalBehaviour());
+//        addBehaviour(new RejectProposalBehaviour());
+        System.out.println(agentId + " started with wagon: " + wagon.getId() +
+                " at station: " + wagon.getCurrentStation() +
+                ", schedule size: " + scheduleData.getSchedule().size());
     }
 
     private class CargoRequestBehaviour extends CyclicBehaviour {
         public void action() {
-            // Ждем запросы от грузов
             MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.CFP);
             ACLMessage msg = myAgent.receive(mt);
 
-            if (msg != null && currentRequest == null) { // Обрабатываем только один запрос за раз
+            if (msg != null && currentRequest == null) {
                 String content = msg.getContent();
                 if (content.startsWith("CARGO_REQUEST:")) {
                     handleCargoRequest(msg, content);
@@ -104,11 +105,14 @@ public class WagonAgent extends Agent {
             double weight = Double.parseDouble(parts[2]);
             String fromStation = parts[3];
             String toStation = parts[4];
-            String priority = parts[5];
+            Date cargoAppearanceTime = new Date(Long.parseLong(parts[5]));
 
-            currentRequest = new CargoRequest(cargoId, cargoType, weight, fromStation, toStation, priority, msg);
+            // ВАЖНОЕ ИЗМЕНЕНИЕ: вычисляем свободное время вагона
+            Date wagonAvailableTime = calculateWagonAvailableTime(cargoAppearanceTime);
 
-            // Проверяем возможность перевозки
+            currentRequest = new CargoRequest(cargoId, cargoType, weight, fromStation,
+                    toStation, wagonAvailableTime, msg);
+
             if (!wagon.canCarryCargo(cargoType, weight)) {
                 System.out.println(agentId + ": Cannot carry cargo " + cargoType + " weight " + weight);
                 ACLMessage reply = msg.createReply();
@@ -130,9 +134,29 @@ public class WagonAgent extends Agent {
                 return;
             }
 
-            // Если проверки прошли, запрашиваем локомотивы
-            System.out.println(agentId + ": Cargo " + cargoId + " compatible, requesting locomotives");
+            System.out.println(agentId + ": Cargo " + cargoId + " compatible, wagon available at: " +
+                    wagonAvailableTime + ", requesting locomotives");
             requestLocomotives();
+        }
+
+        private Date calculateWagonAvailableTime(Date requestedTime) {
+            // Если расписание пустое, вагон свободен с requestedTime
+            if (scheduleData.getSchedule().isEmpty()) {
+                return requestedTime;
+            }
+
+            // Получаем последний занятый временной слот
+            List<TimeSlot> schedule = scheduleData.getSchedule();
+            TimeSlot lastSlot = schedule.get(schedule.size() - 1);
+
+            // Если requestedTime позже, чем время окончания последнего слота,
+            // то вагон свободен с requestedTime
+            if (requestedTime.after(lastSlot.getEndTime())) {
+                return requestedTime;
+            }
+
+            // Иначе вагон будет свободен после окончания последнего слота
+            return lastSlot.getEndTime();
         }
 
         private void requestLocomotives() {
@@ -148,19 +172,23 @@ public class WagonAgent extends Agent {
                         locomotiveAgentsContacted.add(desc.getName().getLocalName());
                         ACLMessage msg = new ACLMessage(ACLMessage.CFP);
                         msg.addReceiver(desc.getName());
+
+                        // ВАЖНОЕ ИЗМЕНЕНИЕ: отправляем свободное время вагона, а не время появления груза
                         msg.setContent("WAGON_REQUEST:" + currentRequest.cargoId + ":" +
                                 currentRequest.cargoType + ":" + currentRequest.weight + ":" +
                                 currentRequest.fromStation + ":" + currentRequest.toStation + ":" +
-                                wagon.getId() + ":" + wagon.getCapacity() + ":" + currentRequest.priority);
+                                wagon.getId() + ":" + wagon.getCapacity() + ":" +
+                                currentRequest.wagonAvailableTime.getTime()); // Используем wagonAvailableTime
+
                         myAgent.send(msg);
-                        System.out.println(agentId + ": Sent request to locomotive: " + desc.getName().getLocalName());
+                        System.out.println(agentId + ": Sent request to locomotive: " + desc.getName().getLocalName() +
+                                " with wagon available time: " + currentRequest.wagonAvailableTime);
                     }
                     expectedLocomotiveResponses = locoAgents.length;
                     startTime = System.currentTimeMillis();
                     System.out.println(agentId + ": Sent requests to " + locoAgents.length + " locomotive agents");
                 } else {
                     System.out.println(agentId + ": No locomotive agents found!");
-                    // Отправляем отказ грузу
                     ACLMessage reply = currentRequest.originalMessage.createReply();
                     reply.setPerformative(ACLMessage.REFUSE);
                     reply.setContent("NO_LOCOMOTIVE_AVAILABLE");
@@ -183,16 +211,14 @@ public class WagonAgent extends Agent {
                 return;
             }
 
-            // Проверяем таймаут
             if ((System.currentTimeMillis() - startTime) > TIMEOUT) {
                 System.out.println(agentId + ": Timeout waiting for locomotive responses. Received " +
                         locomotiveProposals.size() + " of " + expectedLocomotiveResponses);
 
                 if (locomotiveProposals.size() > 0) {
-                    selectBestLocomotiveProposal();
+                    processLocomotiveProposals();
                 } else {
                     System.out.println(agentId + ": No locomotive proposals received");
-                    // Отправляем отказ грузу
                     ACLMessage reply = currentRequest.originalMessage.createReply();
                     reply.setPerformative(ACLMessage.REFUSE);
                     reply.setContent("NO_LOCOMOTIVE_RESPONSE");
@@ -217,10 +243,19 @@ public class WagonAgent extends Agent {
                     String content = msg.getContent();
                     String[] parts = content.split(":");
                     Date availableTime = new Date(Long.parseLong(parts[0]));
-                    double cost = Double.parseDouble(parts[1]);
-                    String locomotiveId = parts[2];
+                    String locomotiveId = parts[1];
+                    String cargoId = parts.length > 2 ? parts[2] : null;
 
-                    Proposal proposal = new Proposal(sender, locomotiveId, availableTime, cost, true);
+                    if (!currentRequest.cargoId.equals(cargoId)) {
+                        System.out.println(agentId + ": Received proposal for wrong cargo: " + cargoId);
+                        ACLMessage refuseMsg = new ACLMessage(ACLMessage.REFUSE);
+                        refuseMsg.addReceiver(msg.getSender());
+                        refuseMsg.setContent("WRONG_CARGO");
+                        myAgent.send(refuseMsg);
+                        return;
+                    }
+
+                    Proposal proposal = new Proposal(sender, locomotiveId, availableTime, true);
                     locomotiveProposals.put(sender, proposal);
                     System.out.println(agentId + ": Received proposal from locomotive " + sender);
                 } else if (msg.getPerformative() == ACLMessage.REFUSE) {
@@ -229,10 +264,9 @@ public class WagonAgent extends Agent {
                     System.out.println(agentId + ": Received refusal from locomotive " + sender);
                 }
 
-                // Проверяем, получили ли все ответы
                 if (locomotiveProposals.size() >= expectedLocomotiveResponses) {
                     System.out.println(agentId + ": Received all " + locomotiveProposals.size() + " locomotive responses");
-                    selectBestLocomotiveProposal();
+                    processLocomotiveProposals();
                     resetState();
                 }
             } else {
@@ -240,7 +274,7 @@ public class WagonAgent extends Agent {
             }
         }
 
-        private void selectBestLocomotiveProposal() {
+        private void processLocomotiveProposals() {
             List<Proposal> allProposals = new ArrayList<>(locomotiveProposals.values());
             bestLocomotiveProposal = TimeUtils.selectBestProposal(allProposals);
 
@@ -248,82 +282,88 @@ public class WagonAgent extends Agent {
                 System.out.println(agentId + ": Selected locomotive " + bestLocomotiveProposal.getResourceId() +
                         " with time: " + bestLocomotiveProposal.getAvailableTime());
 
-                // Рассчитываем итоговое предложение для груза
-                // Добавляем время на погрузку/разгрузку (30 минут)
-                Date wagonAvailableTime = TimeUtils.addMinutes(bestLocomotiveProposal.getAvailableTime(), 30);
-                // Рассчитываем стоимость (стоимость локомотива + стоимость использования вагона)
-                double wagonCost = 50.0; // Базовая стоимость использования вагона
-                double totalCost = bestLocomotiveProposal.getCost() + wagonCost;
-
-                // Отправляем предложение грузу
                 ACLMessage reply = currentRequest.originalMessage.createReply();
                 reply.setPerformative(ACLMessage.PROPOSE);
-                reply.setContent(wagonAvailableTime.getTime() + ":" + totalCost + ":" + wagon.getId());
+                reply.setContent(bestLocomotiveProposal.getAvailableTime().getTime() + ":" + wagon.getId());
                 myAgent.send(reply);
-                System.out.println(agentId + ": Sent proposal to cargo for time: " + wagonAvailableTime + ", cost: " + totalCost);
-
-                // Отправляем подтверждение выбранному локомотиву
-                ACLMessage acceptMsg = new ACLMessage(ACLMessage.ACCEPT_PROPOSAL);
-                acceptMsg.addReceiver(new jade.core.AID(bestLocomotiveProposal.getAgentId(), jade.core.AID.ISLOCALNAME));
-                acceptMsg.setContent("ACCEPT_PROPOSAL:" + currentRequest.cargoId);
-                myAgent.send(acceptMsg);
-
-                // Отправляем отказы остальным локомотивам
-                for (Map.Entry<String, Proposal> entry : locomotiveProposals.entrySet()) {
-                    if (!entry.getKey().equals(bestLocomotiveProposal.getAgentId())) {
-                        ACLMessage rejectMsg = new ACLMessage(ACLMessage.REJECT_PROPOSAL);
-                        rejectMsg.addReceiver(new jade.core.AID(entry.getKey(), jade.core.AID.ISLOCALNAME));
-                        rejectMsg.setContent("REJECT_PROPOSAL:" + currentRequest.cargoId);
-                        myAgent.send(rejectMsg);
-                    }
-                }
+                System.out.println(agentId + ": Sent proposal to cargo for time: " + bestLocomotiveProposal.getAvailableTime());
             } else {
                 System.out.println(agentId + ": No suitable locomotive found!");
-                // Отправляем отказ грузу
                 ACLMessage reply = currentRequest.originalMessage.createReply();
                 reply.setPerformative(ACLMessage.REFUSE);
                 reply.setContent("NO_SUITABLE_LOCOMOTIVE");
                 myAgent.send(reply);
             }
         }
-
-        private void resetState() {
-            locomotiveProposals.clear();
-            locomotiveAgentsContacted.clear();
-            expectedLocomotiveResponses = 0;
-            bestLocomotiveProposal = null;
-            currentRequest = null;
-        }
     }
 
-    private class BookingConfirmationBehaviour extends CyclicBehaviour {
+    private class AcceptProposalBehaviour extends CyclicBehaviour {
         public void action() {
-            MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.CONFIRM);
+            MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.ACCEPT_PROPOSAL);
             ACLMessage msg = myAgent.receive(mt);
 
             if (msg != null) {
                 String content = msg.getContent();
-                if (content.startsWith("SCHEDULE_CREATED:")) {
-                    String scheduleId = content.substring("SCHEDULE_CREATED:".length());
+                if (content.startsWith("ACCEPT_PROPOSAL:")) {
+                    String[] parts = content.substring("ACCEPT_PROPOSAL:".length()).split(":");
+                    String cargoId = parts[0];
+                    String toStation = parts[1];
+                    String departureTimeStr = parts.length > 2 ? parts[2] : null;
 
-                    // Пересылаем подтверждение грузу
+                    if (bestLocomotiveProposal != null) {
+                        // Бронируем выбранный локомотив
+                        ACLMessage acceptMsg = new ACLMessage(ACLMessage.ACCEPT_PROPOSAL);
+                        acceptMsg.addReceiver(new jade.core.AID(bestLocomotiveProposal.getAgentId(), jade.core.AID.ISLOCALNAME));
+
+                        if (departureTimeStr != null) {
+                            acceptMsg.setContent("ACCEPT_PROPOSAL:" + cargoId + ":" + toStation + ":" + departureTimeStr);
+                        } else {
+                            acceptMsg.setContent("ACCEPT_PROPOSAL:" + cargoId + ":" + toStation);
+                        }
+
+                        myAgent.send(acceptMsg);
+
+                        currentCargoId = cargoId;
+                        currentCargoToStation = toStation;
+
+                        System.out.println(agentId + ": Accepted locomotive " + bestLocomotiveProposal.getAgentId() +
+                                " for cargo " + cargoId);
+                    }
+                } else if (content.startsWith("SCHEDULE_CREATED:")) {
+                    String[] parts = content.substring("SCHEDULE_CREATED:".length()).split(":");
+                    String scheduleId = parts[0];
+                    Date departureTime = new Date(Long.parseLong(parts[1]));
+                    Date arrivalTime = new Date(Long.parseLong(parts[2]));
+
+                    // Резервируем время для вагона
+                    scheduleData.reserveTimeSlot(departureTime, arrivalTime);
+
+                    // Отправляем подтверждение грузу
                     try {
                         DFAgentDescription template = new DFAgentDescription();
                         ServiceDescription sd = new ServiceDescription();
                         sd.setType("cargo");
                         template.addServices(sd);
                         DFAgentDescription[] cargoAgents = DFService.search(myAgent, template);
-                        if (cargoAgents.length > 0) {
+                        for (DFAgentDescription desc : cargoAgents) {
                             ACLMessage confirmMsg = new ACLMessage(ACLMessage.CONFIRM);
-                            confirmMsg.addReceiver(cargoAgents[0].getName());
-                            confirmMsg.setContent("SCHEDULE_CONFIRMED:" + scheduleId);
+                            confirmMsg.addReceiver(desc.getName());
+                            confirmMsg.setContent("SCHEDULE_CONFIRMED:" + scheduleId + ":" +
+                                    departureTime.getTime() + ":" + arrivalTime.getTime());
                             myAgent.send(confirmMsg);
                         }
                     } catch (FIPAException e) {
                         e.printStackTrace();
                     }
 
-                    System.out.println(agentId + ": Schedule created, confirmation sent to cargo");
+                    System.out.println(agentId + ": Schedule created: " + scheduleId);
+
+                    // После доставки освобождаем вагон и меняем станцию
+                    wagon.setCurrentStation(currentCargoToStation);
+                    wagon.setAvailable(true);
+                    System.out.println(agentId + ": Wagon moved to station: " + currentCargoToStation);
+
+                    resetState();
                 }
             } else {
                 block();
@@ -331,17 +371,27 @@ public class WagonAgent extends Agent {
         }
     }
 
-    private class ScheduleFinalizationBehaviour extends CyclicBehaviour {
+    private class RejectProposalBehaviour extends CyclicBehaviour {
         public void action() {
-            MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.INFORM);
+            MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.REJECT_PROPOSAL);
             ACLMessage msg = myAgent.receive(mt);
 
             if (msg != null) {
                 String content = msg.getContent();
-                if (content.startsWith("SCHEDULE_FINALIZED:")) {
-                    String scheduleId = content.substring("SCHEDULE_FINALIZED:".length());
-                    wagon.setAvailable(false);
-                    System.out.println(agentId + ": Schedule finalized: " + scheduleId);
+                if (content.startsWith("REJECT_PROPOSAL:")) {
+                    String cargoId = content.substring("REJECT_PROPOSAL:".length());
+
+                    if (bestLocomotiveProposal != null) {
+                        // Отменяем бронирование локомотива
+                        ACLMessage rejectMsg = new ACLMessage(ACLMessage.REJECT_PROPOSAL);
+                        rejectMsg.addReceiver(new jade.core.AID(bestLocomotiveProposal.getAgentId(), jade.core.AID.ISLOCALNAME));
+                        rejectMsg.setContent("REJECT_PROPOSAL:" + cargoId);
+                        myAgent.send(rejectMsg);
+
+                        System.out.println(agentId + ": Rejected by cargo " + cargoId + ", canceling locomotive");
+                    }
+
+                    resetState();
                 }
             } else {
                 block();
@@ -349,8 +399,18 @@ public class WagonAgent extends Agent {
         }
     }
 
+    private void resetState() {
+        locomotiveProposals.clear();
+        locomotiveAgentsContacted.clear();
+        expectedLocomotiveResponses = 0;
+        bestLocomotiveProposal = null;
+        currentRequest = null;
+        currentCargoId = null;
+        currentCargoToStation = null;
+    }
+
     protected void takeDown() {
         try { DFService.deregister(this); } catch (FIPAException e) {}
-        System.out.println(agentId + " terminated");
+        System.out.println(agentId + " terminated at station: " + wagon.getCurrentStation());
     }
 }
