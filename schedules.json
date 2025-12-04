@@ -4,7 +4,7 @@
     "locomotiveId": "L2",
     "distance": 400.0,
     "cargoIds": "C2",
-    "creationTime": "Dec 4, 2025, 11:58:57 PM",
+    "creationTime": "Dec 5, 2025, 1:10:30 AM",
     "roadAgent": "RoadAgent2",
     "wagonIds": "W2",
     "fromStation": "ST2",
@@ -13,7 +13,24 @@
     "arrivalTime": "Jan 1, 2025, 2:40:00 PM",
     "totalWeight": 30.0,
     "trainAvailableTime": "Jan 1, 2025, 8:00:00 AM",
-    "scheduleId": "SCHEDULE_1764874737448_L2_2747",
+    "scheduleId": "SCHEDULE_1764879029999_L2_2747",
+    "compositionSize": 1.0
+  },
+  {
+    "departureTime": "Jan 1, 2025, 8:00:00 AM",
+    "locomotiveId": "L1",
+    "distance": 650.0,
+    "cargoIds": "C1",
+    "creationTime": "Dec 5, 2025, 1:10:49 AM",
+    "roadAgent": "RoadAgent1",
+    "wagonIds": "W1",
+    "fromStation": "ST1",
+    "toStation": "ST2",
+    "duration": "650 min",
+    "arrivalTime": "Jan 1, 2025, 6:50:00 PM",
+    "totalWeight": 50.0,
+    "trainAvailableTime": "Jan 1, 2025, 8:00:00 AM",
+    "scheduleId": "SCHEDULE_1764879049466_L1_2746",
     "compositionSize": 1
   }
 ]

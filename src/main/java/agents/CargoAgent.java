@@ -97,7 +97,6 @@ public class CargoAgent extends Agent {
     }
 
     private class WaitForWagonResponsesBehaviour extends TickerBehaviour {
-        private final long TIMEOUT = 30000;
         private MessageTemplate mt = MessageTemplate.or(
                 MessageTemplate.MatchPerformative(ACLMessage.PROPOSE),
                 MessageTemplate.MatchPerformative(ACLMessage.REFUSE)
@@ -117,12 +116,13 @@ public class CargoAgent extends Agent {
                 return;
             }
 
-            if ((System.currentTimeMillis() - startTime) > TIMEOUT) {
-                System.out.println(agentId + ": Timeout waiting for wagon responses. Received " +
-                        wagonProposals.size() + " of " + expectedWagonResponses);
-                processProposals();
-                return;
-            }
+            // УДАЛЕНО: Таймаут ожидания ответов от вагонов
+            // if ((System.currentTimeMillis() - startTime) > TIMEOUT) {
+            //     System.out.println(agentId + ": Timeout waiting for wagon responses. Received " +
+            //             wagonProposals.size() + " of " + expectedWagonResponses);
+            //     processProposals();
+            //     return;
+            // }
 
             ACLMessage msg = receive(mt);
 

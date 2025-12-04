@@ -103,25 +103,9 @@ public class WagonAgent extends Agent {
         addBehaviour(new WaitForLocomotiveResponsesBehaviour(this, 100));
         addBehaviour(new AcceptProposalBehaviour(this, 100));
         addBehaviour(new RetryManagerBehaviour(this, 10000));
-        addBehaviour(new DebugBehaviour(this, 100)); // Для отладки
 
         System.out.println(agentId + " started with wagon: " + wagon.getId() +
                 " at station: " + wagon.getCurrentStation());
-    }
-
-    private class DebugBehaviour extends TickerBehaviour {
-        public DebugBehaviour(Agent a, long period) {
-            super(a, period);
-        }
-
-        protected void onTick() {
-            ACLMessage msg = receive();
-            if (msg != null) {
-                System.out.println("DEBUG ALL " + agentId + ": Received: " + msg.getPerformative() +
-                        " content: " + msg.getContent() +
-                        " from: " + msg.getSender().getLocalName());
-            }
-        }
     }
 
     private class CargoRequestBehaviour extends TickerBehaviour {
@@ -152,10 +136,6 @@ public class WagonAgent extends Agent {
             Date cargoAppearanceTime = new Date(Long.parseLong(parts[5]));
 
             String requestKey = cargoId + "_" + agentId;
-//            if (processedCargoRequests.contains(requestKey)) {
-//                System.out.println(agentId + ": Already processed cargo " + cargoId);
-//                return;
-//            }
 
             Date wagonAvailableTime = calculateWagonAvailableTime(cargoAppearanceTime);
 
@@ -278,24 +258,25 @@ public class WagonAgent extends Agent {
                 return;
             }
 
-            if ((System.currentTimeMillis() - startTime) > REQUEST_TIMEOUT) {
-                System.out.println(agentId + ": Timeout waiting for locomotive responses for cargo " + currentCargoId);
-
-                if (locomotiveProposals.size() > 0) {
-                    processLocomotiveProposals(request);
-                } else {
-                    if (request.canRetry()) {
-                        System.out.println(agentId + ": Will retry request for cargo " + currentCargoId);
-                        request.attemptCount++;
-                        requestLocomotives(request);
-                    } else {
-                        System.out.println(agentId + ": Max retries reached or request expired for cargo " + currentCargoId);
-                        sendRefusal(request.originalMessage, "NO_LOCOMOTIVE_RESPONSE", currentCargoId);
-                        request.isActive = false;
-                    }
-                }
-                return;
-            }
+            // УДАЛЕНО: Таймаут ожидания ответов
+            // if ((System.currentTimeMillis() - startTime) > REQUEST_TIMEOUT) {
+            //     System.out.println(agentId + ": Timeout waiting for locomotive responses for cargo " + currentCargoId);
+            //
+            //     if (locomotiveProposals.size() > 0) {
+            //         processLocomotiveProposals(request);
+            //     } else {
+            //         if (request.canRetry()) {
+            //             System.out.println(agentId + ": Will retry request for cargo " + currentCargoId);
+            //             request.attemptCount++;
+            //             requestLocomotives(request);
+            //         } else {
+            //             System.out.println(agentId + ": Max retries reached or request expired for cargo " + currentCargoId);
+            //             sendRefusal(request.originalMessage, "NO_LOCOMOTIVE_RESPONSE", currentCargoId);
+            //             request.isActive = false;
+            //         }
+            //     }
+            //     return;
+            // }
 
             if (locomotiveProposals.size() >= expectedLocomotiveResponses && expectedLocomotiveResponses > 0) {
                 System.out.println(agentId + ": Received all " + locomotiveProposals.size() + " locomotive responses");

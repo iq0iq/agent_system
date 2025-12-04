@@ -29,13 +29,12 @@ public class LocomotiveAgent extends Agent {
     private Map<String, WagonRequest> pendingWagonRequests = new HashMap<>();
     private TrainComposition currentComposition = null;
     private boolean isProcessingComposition = false;
-    private final long COMPOSITION_TIMEOUT = 30000;
-    private final long ROAD_RESPONSE_TIMEOUT = 30000;
-    private final long WAGON_ACCEPT_TIMEOUT = 10000;
+    private final long COMPOSITION_TIMEOUT = 15000; // Таймаут очистки старых запросов
+    private final long WAGON_ACCEPT_TIMEOUT = 20000; // ВОССТАНОВЛЕНО: таймаут ожидания подтверждения от вагонов
 
     private Map<String, WagonAcceptance> acceptedWagons = new HashMap<>();
     private boolean waitingForWagonAcceptances = false;
-    private long wagonAcceptStartTime = 0;
+    private long wagonAcceptStartTime = 0; // ВОССТАНОВЛЕНО
 
     private Set<String> processedWagonRequests = new HashSet<>();
     private boolean roadRequestSent = false;
@@ -280,15 +279,13 @@ public class LocomotiveAgent extends Agent {
 
             String requestKey = wagonId + "_" + cargoId;
 
-//            if (processedWagonRequests.contains(requestKey)) {
-//                System.out.println(agentId + ": Request for wagon " + wagonId +
-//                        " and cargo " + cargoId + " already processed");
-//                return;
-//            }
-
             if (currentComposition != null && currentComposition.containsCargo(cargoId)) {
                 System.out.println(agentId + ": Cargo " + cargoId +
-                        " is already in current composition, ignoring duplicate request");
+                        " is already in current composition, sending immediate proposal");
+                ACLMessage reply = msg.createReply();
+                reply.setPerformative(ACLMessage.PROPOSE);
+                reply.setContent(new Date().getTime() + ":" + locomotive.getId() + ":" + cargoId);
+                myAgent.send(reply);
                 return;
             }
 
@@ -461,20 +458,6 @@ public class LocomotiveAgent extends Agent {
                 return;
             }
 
-            if ((System.currentTimeMillis() - startTime) > ROAD_RESPONSE_TIMEOUT) {
-                System.out.println(agentId + ": Timeout waiting for road responses. Received " +
-                        roadProposals.size() + " of " + expectedRoadResponses);
-
-                if (roadProposals.size() > 0) {
-                    processRoadProposals();
-                } else {
-                    System.out.println(agentId + ": No road proposals received");
-                    sendRefusalsToWagons("NO_ROAD_RESPONSE");
-                    resetCompositionState();
-                }
-                return;
-            }
-
             if (roadProposals.size() >= expectedRoadResponses && expectedRoadResponses > 0) {
                 System.out.println(agentId + ": Received all " + roadProposals.size() + " road responses");
                 processRoadProposals();
@@ -616,6 +599,10 @@ public class LocomotiveAgent extends Agent {
             long currentTime = System.currentTimeMillis();
             boolean shouldSend = false;
 
+            // ВОССТАНОВЛЕНО: Отправляем подтверждение дороге, если:
+            // 1. Истек таймаут ожидания
+            // 2. Все вагоны ответили
+            // 3. Прошло достаточно времени после первого подтверждения
             if (currentTime - wagonAcceptStartTime > WAGON_ACCEPT_TIMEOUT) {
                 System.out.println(agentId + ": Wagon acceptance timeout reached");
                 shouldSend = true;
@@ -627,6 +614,7 @@ public class LocomotiveAgent extends Agent {
             }
 
             if (acceptedWagons.size() > 0 && currentTime - wagonAcceptStartTime > 5000) {
+                System.out.println(agentId + ": Sending acceptance with " + acceptedWagons.size() + " wagons");
                 shouldSend = true;
             }
 
@@ -719,6 +707,7 @@ public class LocomotiveAgent extends Agent {
         protected void onTick() {
             long currentTime = System.currentTimeMillis();
 
+            // Очистка старых запросов от вагонов (COMPOSITION_TIMEOUT)
             if (!pendingWagonRequests.isEmpty()) {
                 Iterator<Map.Entry<String, WagonRequest>> pendingIterator = pendingWagonRequests.entrySet().iterator();
 
@@ -740,8 +729,9 @@ public class LocomotiveAgent extends Agent {
                 }
             }
 
+            // Очистка зависших ожиданий подтверждения от вагонов
             if (waitingForWagonAcceptances &&
-                    (currentTime - wagonAcceptStartTime) > (WAGON_ACCEPT_TIMEOUT + 5000)) {
+                    (currentTime - wagonAcceptStartTime) > (WAGON_ACCEPT_TIMEOUT + 10000)) {
                 System.out.println(agentId + ": Stuck waiting for wagon acceptances, resetting state");
                 resetCompositionState();
             }
