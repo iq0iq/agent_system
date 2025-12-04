@@ -6,7 +6,7 @@
         "agentId": "CargoAgent1",
         "cargo": {
           "id": "C1",
-          "type": "сыпучий",
+          "type": "bulk",
           "weight": 50.0,
           "fromStation": "ST1",
           "toStation": "ST2"
@@ -16,7 +16,7 @@
         "agentId": "CargoAgent2",
         "cargo": {
           "id": "C2",
-          "type": "жидкий",
+          "type": "liquid",
           "weight": 30.0,
           "fromStation": "ST2",
           "toStation": "ST3"
@@ -26,10 +26,10 @@
         "agentId": "CargoAgent3",
         "cargo": {
           "id": "C3",
-          "type": "сыпучий",
+          "type": "bulk",
           "weight": 40.0,
           "fromStation": "ST1",
-          "toStation": "ST3"
+          "toStation": "ST2"
         }
       }
     ],
@@ -38,20 +38,20 @@
         "agentId": "WagonAgent1",
         "wagon": {
           "id": "W1",
-          "type": "сыпучий",
+          "type": "bulk",
           "capacity": 60.0,
           "currentStation": "ST1",
-          "compatibleCargoTypes": ["сыпучий", "насыпной"]
+          "compatibleCargoTypes": ["bulk", "granular"]
         }
       },
       {
         "agentId": "WagonAgent2",
         "wagon": {
           "id": "W2",
-          "type": "цистерна",
+          "type": "tank",
           "capacity": 40.0,
           "currentStation": "ST2",
-          "compatibleCargoTypes": ["жидкий", "газ"]
+          "compatibleCargoTypes": ["liquid", "gas"]
         }
       }
     ],
@@ -60,7 +60,7 @@
         "agentId": "LocomotiveAgent1",
         "locomotive": {
           "id": "L1",
-          "type": "электровоз",
+          "type": "electric",
           "currentStation": "ST1",
           "maxWeightCapacity": 200.0
         }
@@ -69,7 +69,7 @@
         "agentId": "LocomotiveAgent2",
         "locomotive": {
           "id": "L2",
-          "type": "тепловоз",
+          "type": "diesel",
           "currentStation": "ST2",
           "maxWeightCapacity": 150.0
         }
@@ -105,18 +105,18 @@
   "stations": [
     {
       "id": "ST1",
-      "name": "Москва",
-      "location": "Москва"
+      "name": "Moscow",
+      "location": "Moscow"
     },
     {
       "id": "ST2",
-      "name": "Санкт-Петербург",
-      "location": "СПб"
+      "name": "Saint Petersburg",
+      "location": "SPb"
     },
     {
       "id": "ST3",
-      "name": "Нижний Новгород",
-      "location": "НН"
+      "name": "Nizhny Novgorod",
+      "location": "NN"
     }
   ]
 }

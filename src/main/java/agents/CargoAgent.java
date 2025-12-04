@@ -2,7 +2,6 @@ package agents;
 
 import jade.core.Agent;
 import jade.core.behaviours.TickerBehaviour;
-import jade.core.behaviours.CyclicBehaviour;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 import jade.domain.DFService;
@@ -24,6 +23,7 @@ public class CargoAgent extends Agent {
     private Proposal bestWagonProposal = null;
     private long startTime;
     private boolean isProcessing = false;
+    private boolean requestSent = false; // Добавлено поле класса
 
     protected void setup() {
         agentId = (String) getArguments()[0];
@@ -49,12 +49,12 @@ public class CargoAgent extends Agent {
                 " at station: " + cargo.getFromStation());
 
         addBehaviour(new RequestWagonsBehaviour(this, 3000));
-//        addBehaviour(new WaitForWagonResponsesBehaviour());
-//        addBehaviour(new ScheduleConfirmationBehaviour());
+        addBehaviour(new WaitForWagonResponsesBehaviour(this, 100));
+        addBehaviour(new ScheduleConfirmationBehaviour(this, 100));
     }
 
     private class RequestWagonsBehaviour extends TickerBehaviour {
-        private boolean requestSent = false;
+        // private boolean requestSent = false; // Удалено локальное поле
 
         public RequestWagonsBehaviour(Agent a, long period) {
             super(a, period);
@@ -97,118 +97,129 @@ public class CargoAgent extends Agent {
         }
     }
 
-//    private class WaitForWagonResponsesBehaviour extends CyclicBehaviour {
-//        private final long TIMEOUT = 60000; // 60 секунд
-//
-//        public void action() {
-//            if (!isProcessing) {
-//                block(1000);
-//                return;
-//            }
-//
-//            if (wagonProposals.size() >= expectedWagonResponses) {
-//                processProposals();
-//                return;
-//            }
-//
-//            if ((System.currentTimeMillis() - startTime) > TIMEOUT) {
-//                System.out.println(agentId + ": Timeout waiting for wagon responses. Received " +
-//                        wagonProposals.size() + " of " + expectedWagonResponses);
-//                processProposals();
-//                return;
-//            }
-//
-//            MessageTemplate mt = MessageTemplate.or(
-//                    MessageTemplate.MatchPerformative(ACLMessage.PROPOSE),
-//                    MessageTemplate.MatchPerformative(ACLMessage.REFUSE)
-//            );
-//
-//            ACLMessage msg = receive(mt);
-//
-//            if (msg != null) {
-//                String sender = msg.getSender().getLocalName();
-//
-//                if (msg.getPerformative() == ACLMessage.PROPOSE) {
-//                    String content = msg.getContent();
-//                    String[] parts = content.split(":");
-//                    Date availableTime = new Date(Long.parseLong(parts[0]));
-//                    String wagonId = parts[1];
-//
-//                    Proposal proposal = new Proposal(sender, wagonId, availableTime, true);
-//                    wagonProposals.put(sender, proposal);
-//                    System.out.println(agentId + ": Received proposal from " + sender +
-//                            " - time: " + availableTime);
-//                } else if (msg.getPerformative() == ACLMessage.REFUSE) {
-//                    Proposal proposal = new Proposal(sender, msg.getContent());
-//                    wagonProposals.put(sender, proposal);
-//                    System.out.println(agentId + ": Received refusal from " + sender);
-//                }
-//            } else {
-//                block(1000);
-//            }
-//        }
-//
-//        private void processProposals() {
-//            System.out.println(agentId + ": Received " + wagonProposals.size() + " responses");
-//
-//            List<Proposal> allProposals = new ArrayList<>(wagonProposals.values());
-//            bestWagonProposal = TimeUtils.selectBestProposal(allProposals);
-//
-//            if (bestWagonProposal != null) {
-//                System.out.println(agentId + ": Selected wagon " + bestWagonProposal.getResourceId() +
-//                        " with time: " + bestWagonProposal.getAvailableTime());
-//
-//                // Бронируем выбранный вагон
-//                ACLMessage acceptMsg = new ACLMessage(ACLMessage.ACCEPT_PROPOSAL);
-//                acceptMsg.addReceiver(new jade.core.AID(bestWagonProposal.getAgentId(), jade.core.AID.ISLOCALNAME));
-//                acceptMsg.setContent("ACCEPT_PROPOSAL:" + cargo.getId() + ":" + cargo.getToStation());
-//                send(acceptMsg);
-//                System.out.println(agentId + ": Sent acceptance to " + bestWagonProposal.getAgentId());
-//
-//                // Отправляем отказы остальным вагонам
-//                for (Map.Entry<String, Proposal> entry : wagonProposals.entrySet()) {
-//                    if (!entry.getKey().equals(bestWagonProposal.getAgentId())) {
-//                        ACLMessage rejectMsg = new ACLMessage(ACLMessage.REJECT_PROPOSAL);
-//                        rejectMsg.addReceiver(new jade.core.AID(entry.getKey(), jade.core.AID.ISLOCALNAME));
-//                        rejectMsg.setContent("REJECT_PROPOSAL:" + cargo.getId());
-//                        send(rejectMsg);
-//                    }
-//                }
-//            } else {
-//                System.out.println(agentId + ": No suitable wagon found!");
-//            }
-//
-//            // Сбрасываем состояние
-//            wagonProposals.clear();
-//            wagonAgentsContacted.clear();
-//            expectedWagonResponses = 0;
-//            isProcessing = false;
-//        }
-//    }
-//
-//    private class ScheduleConfirmationBehaviour extends CyclicBehaviour {
-//        public void action() {
-//            MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.CONFIRM);
-//            ACLMessage msg = receive(mt);
-//
-//            if (msg != null) {
-//                String content = msg.getContent();
-//                if (content.startsWith("SCHEDULE_CONFIRMED:")) {
-//                    String[] parts = content.substring("SCHEDULE_CONFIRMED:".length()).split(":");
-//                    String scheduleId = parts[0];
-//                    Date departureTime = new Date(Long.parseLong(parts[1]));
-//                    Date arrivalTime = new Date(Long.parseLong(parts[2]));
-//
-//                    System.out.println(agentId + ": Schedule confirmed: " + scheduleId +
-//                            ", departure: " + departureTime +
-//                            ", arrival: " + arrivalTime);
-//                }
-//            } else {
-//                block();
-//            }
-//        }
-//    }
-//
+    private class WaitForWagonResponsesBehaviour extends TickerBehaviour {
+        private final long TIMEOUT = 30000; // 30 секунд
+        private MessageTemplate mt = MessageTemplate.or(
+                MessageTemplate.MatchPerformative(ACLMessage.PROPOSE),
+                MessageTemplate.MatchPerformative(ACLMessage.REFUSE)
+        );
+
+        public WaitForWagonResponsesBehaviour(Agent a, long period) {
+            super(a, period);
+        }
+
+        protected void onTick() {
+            if (!isProcessing) {
+                return;
+            }
+
+            if (wagonProposals.size() >= expectedWagonResponses) {
+                processProposals();
+                return;
+            }
+
+            if ((System.currentTimeMillis() - startTime) > TIMEOUT) {
+                System.out.println(agentId + ": Timeout waiting for wagon responses. Received " +
+                        wagonProposals.size() + " of " + expectedWagonResponses);
+                processProposals();
+                return;
+            }
+
+            ACLMessage msg = receive(mt);
+
+            if (msg != null) {
+                String sender = msg.getSender().getLocalName();
+
+                if (msg.getPerformative() == ACLMessage.PROPOSE) {
+                    String content = msg.getContent();
+                    String[] parts = content.split(":");
+                    Date availableTime = new Date(Long.parseLong(parts[0]));
+                    String wagonId = parts[1];
+
+                    Proposal proposal = new Proposal(sender, wagonId, availableTime, true);
+                    wagonProposals.put(sender, proposal);
+                    System.out.println(agentId + ": Received proposal from " + sender +
+                            " - time: " + availableTime);
+                } else if (msg.getPerformative() == ACLMessage.REFUSE) {
+                    Proposal proposal = new Proposal(sender, msg.getContent());
+                    wagonProposals.put(sender, proposal);
+                    System.out.println(agentId + ": Received refusal from " + sender);
+                }
+            }
+        }
+
+        private void processProposals() {
+            System.out.println(agentId + ": Received " + wagonProposals.size() + " responses");
+
+            List<Proposal> allProposals = new ArrayList<>(wagonProposals.values());
+            bestWagonProposal = TimeUtils.selectBestProposal(allProposals);
+
+            if (bestWagonProposal != null) {
+                System.out.println(agentId + ": Selected wagon " + bestWagonProposal.getResourceId() +
+                        " with time: " + bestWagonProposal.getAvailableTime());
+
+                // КРУГ 2: Отправляем запрос на бронирование
+                ACLMessage acceptMsg = new ACLMessage(ACLMessage.ACCEPT_PROPOSAL);
+                acceptMsg.addReceiver(new jade.core.AID(bestWagonProposal.getAgentId(), jade.core.AID.ISLOCALNAME));
+                acceptMsg.setContent("ACCEPT_PROPOSAL:" + cargo.getId() + ":" + cargo.getToStation());
+                send(acceptMsg);
+                System.out.println(agentId + ": Sent acceptance to " + bestWagonProposal.getAgentId());
+
+                // НЕ ОТПРАВЛЯЕМ ОТКАЗЫ ОСТАЛЬНЫМ - они просто не получат ответа
+
+            } else {
+                System.out.println(agentId + ": No suitable wagon found!");
+                // Можно попробовать снова через некоторое время
+                requestSent = false;
+                isProcessing = false;
+            }
+
+            // Сбрасываем состояние для нового запроса
+            wagonProposals.clear();
+            wagonAgentsContacted.clear();
+            expectedWagonResponses = 0;
+            isProcessing = false;
+        }
+    }
+
+    private class ScheduleConfirmationBehaviour extends TickerBehaviour {
+        private MessageTemplate mt = MessageTemplate.or(
+                MessageTemplate.MatchPerformative(ACLMessage.CONFIRM),
+                MessageTemplate.MatchPerformative(ACLMessage.INFORM)
+        );
+
+        public ScheduleConfirmationBehaviour(Agent a, long period) {
+            super(a, period);
+        }
+
+        protected void onTick() {
+            ACLMessage msg = receive(mt);
+
+            if (msg != null) {
+                String content = msg.getContent();
+                if (content.startsWith("SCHEDULE_CONFIRMED:")) {
+                    String[] parts = content.substring("SCHEDULE_CONFIRMED:".length()).split(":");
+                    String scheduleId = parts[0];
+                    Date departureTime = new Date(Long.parseLong(parts[1]));
+                    Date arrivalTime = new Date(Long.parseLong(parts[2]));
+
+                    System.out.println("✅ " + agentId + ": Schedule confirmed: " + scheduleId +
+                            ", departure: " + departureTime +
+                            ", arrival: " + arrivalTime);
+                } else if (content.startsWith("SCHEDULE_FINALIZED:")) {
+                    String[] parts = content.substring("SCHEDULE_FINALIZED:".length()).split(":");
+                    String scheduleId = parts[0];
+                    Date departureTime = new Date(Long.parseLong(parts[1]));
+                    Date arrivalTime = new Date(Long.parseLong(parts[2]));
+
+                    System.out.println("✅ " + agentId + ": Schedule FINALIZED: " + scheduleId +
+                            ", departure: " + departureTime +
+                            ", arrival: " + arrivalTime);
+                }
+            }
+        }
+    }
+
     protected void takeDown() {
         try { DFService.deregister(this); } catch (FIPAException e) {}
         System.out.println(agentId + " terminated");
