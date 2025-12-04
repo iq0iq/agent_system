@@ -23,7 +23,7 @@ public class CargoAgent extends Agent {
     private Proposal bestWagonProposal = null;
     private long startTime;
     private boolean isProcessing = false;
-    private boolean requestSent = false; // Добавлено поле класса
+    private boolean requestSent = false;
 
     protected void setup() {
         agentId = (String) getArguments()[0];
@@ -43,7 +43,9 @@ public class CargoAgent extends Agent {
         dfd.addServices(sd);
         try {
             DFService.register(this, dfd);
-        } catch (FIPAException e) {}
+        } catch (FIPAException e) {
+            System.err.println(agentId + ": Error registering with DF: " + e.getMessage());
+        }
 
         System.out.println(agentId + " started with cargo: " + cargo.getId() +
                 " at station: " + cargo.getFromStation());
@@ -54,8 +56,6 @@ public class CargoAgent extends Agent {
     }
 
     private class RequestWagonsBehaviour extends TickerBehaviour {
-        // private boolean requestSent = false; // Удалено локальное поле
-
         public RequestWagonsBehaviour(Agent a, long period) {
             super(a, period);
         }
@@ -86,7 +86,6 @@ public class CargoAgent extends Agent {
                         startTime = System.currentTimeMillis();
                         requestSent = true;
                         System.out.println(agentId + ": Sent requests to " + wagonAgents.length + " wagon agents");
-                        stop();
                     } else {
                         System.out.println(agentId + ": No wagon agents found! Next check in " + (getPeriod()/1000) + " seconds");
                     }
@@ -98,7 +97,7 @@ public class CargoAgent extends Agent {
     }
 
     private class WaitForWagonResponsesBehaviour extends TickerBehaviour {
-        private final long TIMEOUT = 30000; // 30 секунд
+        private final long TIMEOUT = 30000;
         private MessageTemplate mt = MessageTemplate.or(
                 MessageTemplate.MatchPerformative(ACLMessage.PROPOSE),
                 MessageTemplate.MatchPerformative(ACLMessage.REFUSE)
@@ -158,23 +157,18 @@ public class CargoAgent extends Agent {
                 System.out.println(agentId + ": Selected wagon " + bestWagonProposal.getResourceId() +
                         " with time: " + bestWagonProposal.getAvailableTime());
 
-                // КРУГ 2: Отправляем запрос на бронирование
                 ACLMessage acceptMsg = new ACLMessage(ACLMessage.ACCEPT_PROPOSAL);
                 acceptMsg.addReceiver(new jade.core.AID(bestWagonProposal.getAgentId(), jade.core.AID.ISLOCALNAME));
                 acceptMsg.setContent("ACCEPT_PROPOSAL:" + cargo.getId() + ":" + cargo.getToStation());
                 send(acceptMsg);
                 System.out.println(agentId + ": Sent acceptance to " + bestWagonProposal.getAgentId());
 
-                // НЕ ОТПРАВЛЯЕМ ОТКАЗЫ ОСТАЛЬНЫМ - они просто не получат ответа
-
             } else {
                 System.out.println(agentId + ": No suitable wagon found!");
-                // Можно попробовать снова через некоторое время
                 requestSent = false;
                 isProcessing = false;
             }
 
-            // Сбрасываем состояние для нового запроса
             wagonProposals.clear();
             wagonAgentsContacted.clear();
             expectedWagonResponses = 0;
@@ -197,6 +191,8 @@ public class CargoAgent extends Agent {
 
             if (msg != null) {
                 String content = msg.getContent();
+                System.out.println(agentId + ": Received schedule message: " + content);
+
                 if (content.startsWith("SCHEDULE_CONFIRMED:")) {
                     String[] parts = content.substring("SCHEDULE_CONFIRMED:".length()).split(":");
                     String scheduleId = parts[0];
@@ -208,20 +204,28 @@ public class CargoAgent extends Agent {
                             ", arrival: " + arrivalTime);
                 } else if (content.startsWith("SCHEDULE_FINALIZED:")) {
                     String[] parts = content.substring("SCHEDULE_FINALIZED:".length()).split(":");
-                    String scheduleId = parts[0];
-                    Date departureTime = new Date(Long.parseLong(parts[1]));
-                    Date arrivalTime = new Date(Long.parseLong(parts[2]));
+                    if (parts.length >= 3) {
+                        String scheduleId = parts[0];
+                        Date departureTime = new Date(Long.parseLong(parts[1]));
+                        Date arrivalTime = new Date(Long.parseLong(parts[2]));
 
-                    System.out.println("✅ " + agentId + ": Schedule FINALIZED: " + scheduleId +
-                            ", departure: " + departureTime +
-                            ", arrival: " + arrivalTime);
+                        System.out.println("✅ " + agentId + ": Schedule FINALIZED: " + scheduleId +
+                                ", departure: " + departureTime +
+                                ", arrival: " + arrivalTime);
+                    } else {
+                        System.err.println(agentId + ": Invalid SCHEDULE_FINALIZED format: " + content);
+                    }
                 }
             }
         }
     }
 
     protected void takeDown() {
-        try { DFService.deregister(this); } catch (FIPAException e) {}
+        try {
+            DFService.deregister(this);
+        } catch (FIPAException e) {
+            System.err.println(agentId + ": Error deregistering from DF: " + e.getMessage());
+        }
         System.out.println(agentId + " terminated");
     }
 }

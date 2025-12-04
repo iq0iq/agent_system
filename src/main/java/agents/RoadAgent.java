@@ -127,7 +127,6 @@ public class RoadAgent extends Agent {
             try {
                 String[] parts = content.substring("LOCOMOTIVE_REQUEST:".length()).split(":");
 
-                // Проверяем, что у нас достаточно частей
                 if (parts.length < 7) {
                     System.err.println(agentId + ": Invalid LOCOMOTIVE_REQUEST format. Expected 7 parts, got " + parts.length);
                     System.err.println("Content: " + content);
@@ -160,7 +159,6 @@ public class RoadAgent extends Agent {
                         " from locomotive " + locomotiveId + " with wagons " + wagonIds +
                         ", requested time: " + trainAvailableTime);
 
-                // КРУГ 1: Отправляем предложение локомотиву
                 processRequest(request);
             } catch (NumberFormatException e) {
                 System.err.println(agentId + ": Error parsing number in LOCOMOTIVE_REQUEST: " + e.getMessage());
@@ -289,7 +287,6 @@ public class RoadAgent extends Agent {
                 String toStation = parts[1];
                 Date requestedDepartureTime = new Date(Long.parseLong(parts[2]));
 
-                // Ищем соответствующий запрос по cargoIds
                 LocomotiveRequest request = findRequestByCargoIds(cargoIds);
 
                 if (request == null) {
@@ -304,7 +301,6 @@ public class RoadAgent extends Agent {
 
                 int tripDuration = TimeUtils.calculateTripDuration(route.getDistance());
 
-                // Используем предложенное время или время из запроса бронирования
                 Date departureTime;
                 if (requestedDepartureTime != null &&
                         scheduleData.canAddTimeSlot(requestedDepartureTime,
@@ -319,9 +315,7 @@ public class RoadAgent extends Agent {
 
                 Date arrivalTime = TimeUtils.addMinutes(departureTime, tripDuration);
 
-                // ФИНАЛЬНОЕ бронирование - резервируем слот
                 if (!scheduleData.reserveTimeSlot(departureTime, arrivalTime)) {
-                    // Слот уже занят, отправляем отказ
                     ACLMessage rejectMsg = msg.createReply();
                     rejectMsg.setPerformative(ACLMessage.REJECT_PROPOSAL);
                     rejectMsg.setContent("TIME_SLOT_UNAVAILABLE");
@@ -342,18 +336,51 @@ public class RoadAgent extends Agent {
                         ", departure: " + departureTime +
                         ", arrival: " + arrivalTime);
 
-                // Отправляем подтверждение локомотиву
-                ACLMessage confirmMsg = new ACLMessage(ACLMessage.INFORM);
-                confirmMsg.addReceiver(msg.getSender());
-                confirmMsg.setContent("SCHEDULE_FINALIZED:" + scheduleId + ":" +
+                // 1. Отправляем подтверждение локомотиву
+                ACLMessage locomotiveConfirmMsg = new ACLMessage(ACLMessage.INFORM);
+                locomotiveConfirmMsg.addReceiver(msg.getSender());
+                locomotiveConfirmMsg.setContent("SCHEDULE_FINALIZED:" + scheduleId + ":" +
                         departureTime.getTime() + ":" + arrivalTime.getTime() + ":" +
                         request.wagonIds + ":" + request.cargoIds);
-                myAgent.send(confirmMsg);
-
+                myAgent.send(locomotiveConfirmMsg);
                 System.out.println(agentId + ": Sent FINALIZED notification to locomotive " +
                         request.locomotiveId);
 
-                // Удаляем обработанный запрос
+                // 2. Отправляем подтверждение всем вагонам и грузам
+                String[] wagonIdsArray = request.wagonIds.split(",");
+                String[] cargoIdsArray = request.cargoIds.split(",");
+
+                for (int i = 0; i < wagonIdsArray.length; i++) {
+                    String wagonId = wagonIdsArray[i]; // Например "W2"
+                    String cargoId = (i < cargoIdsArray.length) ? cargoIdsArray[i] : ""; // Например "C2"
+
+                    // ИСПРАВЛЕНИЕ: Преобразуем W2 -> WagonAgent2
+                    String wagonAgentName = "WagonAgent" + wagonId.substring(1);
+
+                    // Вагону
+                    ACLMessage wagonConfirmMsg = new ACLMessage(ACLMessage.INFORM);
+                    wagonConfirmMsg.addReceiver(new jade.core.AID(wagonAgentName, jade.core.AID.ISLOCALNAME));
+                    wagonConfirmMsg.setContent("SCHEDULE_FINALIZED:" + scheduleId + ":" +
+                            departureTime.getTime() + ":" + arrivalTime.getTime() + ":" +
+                            cargoId);
+                    myAgent.send(wagonConfirmMsg);
+                    System.out.println(agentId + ": Sent FINALIZED notification to wagon agent " +
+                            wagonAgentName + " (wagonId: " + wagonId + ") for cargo " + cargoId);
+
+                    // Грузу (если указан)
+                    if (!cargoId.isEmpty()) {
+                        String cargoAgentName = "CargoAgent" + cargoId.substring(1);
+
+                        ACLMessage cargoConfirmMsg = new ACLMessage(ACLMessage.INFORM);
+                        cargoConfirmMsg.addReceiver(new jade.core.AID(cargoAgentName, jade.core.AID.ISLOCALNAME));
+                        cargoConfirmMsg.setContent("SCHEDULE_FINALIZED:" + scheduleId + ":" +
+                                departureTime.getTime() + ":" + arrivalTime.getTime());
+                        myAgent.send(cargoConfirmMsg);
+                        System.out.println(agentId + ": Sent FINALIZED notification to cargo agent " +
+                                cargoAgentName + " (cargoId: " + cargoId + ")");
+                    }
+                }
+
                 pendingRequests.remove(request.getRequestId());
             } catch (NumberFormatException e) {
                 System.err.println(agentId + ": Error parsing number in ACCEPT_PROPOSAL: " + e.getMessage());
@@ -460,7 +487,6 @@ public class RoadAgent extends Agent {
                 for (Map.Entry<String, LocomotiveRequest> entry : pendingRequests.entrySet()) {
                     LocomotiveRequest request = entry.getValue();
 
-                    // Удаляем старые запросы (больше 5 минут)
                     if ((currentTime - request.requestTime) > 300000) {
                         System.out.println(agentId + ": Removing old request for cargoes " +
                                 request.cargoIds);

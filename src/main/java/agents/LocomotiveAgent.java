@@ -26,15 +26,13 @@ public class LocomotiveAgent extends Agent {
     private Proposal bestRoadProposal = null;
     private long startTime;
 
-    // Для управления составом
     private Map<String, WagonRequest> pendingWagonRequests = new HashMap<>();
     private TrainComposition currentComposition = null;
     private boolean isProcessingComposition = false;
     private final long COMPOSITION_TIMEOUT = 30000;
     private final long ROAD_RESPONSE_TIMEOUT = 30000;
-    private final long WAGON_ACCEPT_TIMEOUT = 10000; // 10 секунд ожидания вагонов
+    private final long WAGON_ACCEPT_TIMEOUT = 10000;
 
-    // Для отслеживания принявших вагонов
     private Map<String, WagonAcceptance> acceptedWagons = new HashMap<>();
     private boolean waitingForWagonAcceptances = false;
     private long wagonAcceptStartTime = 0;
@@ -42,7 +40,6 @@ public class LocomotiveAgent extends Agent {
     private Set<String> processedWagonRequests = new HashSet<>();
     private boolean roadRequestSent = false;
 
-    // Для отслеживания уже обработанных грузов, чтобы избежать дублирования
     private Set<String> processedCargoIdsInComposition = new HashSet<>();
 
     private class WagonRequest {
@@ -57,7 +54,7 @@ public class LocomotiveAgent extends Agent {
         ACLMessage originalMessage;
         long requestTime;
         boolean isProcessed;
-        boolean isAccepted; // Флаг, что вагон принял предложение
+        boolean isAccepted;
 
         WagonRequest(String cargoId, String cargoType, double weight,
                      String fromStation, String toStation, String wagonId,
@@ -102,7 +99,6 @@ public class LocomotiveAgent extends Agent {
         boolean isConfirmed = false;
         String compositionId;
 
-        // Для отслеживания уникальности вагонов и грузов
         Set<String> wagonIdsInComposition = new HashSet<>();
         Set<String> cargoIdsInComposition = new HashSet<>();
 
@@ -115,19 +111,16 @@ public class LocomotiveAgent extends Agent {
         }
 
         boolean canAddWagon(WagonRequest request) {
-            // 1. Проверяем, что вагон уже не в составе
             if (wagonIdsInComposition.contains(request.wagonId)) {
                 System.out.println("Wagon " + request.wagonId + " is already in composition");
                 return false;
             }
 
-            // 2. Проверяем, что груз уже не в составе (один груз не может быть в двух вагонах)
             if (cargoIdsInComposition.contains(request.cargoId)) {
                 System.out.println("Cargo " + request.cargoId + " is already in composition in another wagon");
                 return false;
             }
 
-            // 3. Проверяем станции
             if (!request.fromStation.equals(fromStation) ||
                     !request.toStation.equals(toStation)) {
                 System.out.println("Station mismatch: wagon from " + request.fromStation +
@@ -136,7 +129,6 @@ public class LocomotiveAgent extends Agent {
                 return false;
             }
 
-            // 4. Проверяем грузоподъемность
             if (totalWeight + request.weight > locomotive.getMaxWeightCapacity()) {
                 System.out.println("Weight limit exceeded: current " + totalWeight +
                         " + new " + request.weight + " > max " + locomotive.getMaxWeightCapacity());
@@ -288,13 +280,12 @@ public class LocomotiveAgent extends Agent {
 
             String requestKey = wagonId + "_" + cargoId;
 
-            if (processedWagonRequests.contains(requestKey)) {
-                System.out.println(agentId + ": Request for wagon " + wagonId +
-                        " and cargo " + cargoId + " already processed");
-                return;
-            }
+//            if (processedWagonRequests.contains(requestKey)) {
+//                System.out.println(agentId + ": Request for wagon " + wagonId +
+//                        " and cargo " + cargoId + " already processed");
+//                return;
+//            }
 
-            // Проверяем, не обрабатываем ли уже этот груз в текущем составе
             if (currentComposition != null && currentComposition.containsCargo(cargoId)) {
                 System.out.println(agentId + ": Cargo " + cargoId +
                         " is already in current composition, ignoring duplicate request");
@@ -330,7 +321,7 @@ public class LocomotiveAgent extends Agent {
         private void sendRefusal(ACLMessage originalMsg, String cargoId, String reason) {
             ACLMessage reply = originalMsg.createReply();
             reply.setPerformative(ACLMessage.REFUSE);
-            reply.setContent(cargoId + ":" + reason); // Добавляем cargoId в отказ
+            reply.setContent(cargoId + ":" + reason);
             myAgent.send(reply);
         }
     }
@@ -455,7 +446,7 @@ public class LocomotiveAgent extends Agent {
                 MessageTemplate.MatchPerformative(ACLMessage.PROPOSE),
                 MessageTemplate.MatchPerformative(ACLMessage.REFUSE)
         );
-        private boolean isProcessing = false; // Флаг для предотвращения повторной обработки
+        private boolean isProcessing = false;
 
         public WaitForRoadResponsesBehaviour(Agent a, long period) {
             super(a, period);
@@ -484,7 +475,6 @@ public class LocomotiveAgent extends Agent {
                 return;
             }
 
-            // Проверяем получение ответов от всех дорог
             if (roadProposals.size() >= expectedRoadResponses && expectedRoadResponses > 0) {
                 System.out.println(agentId + ": Received all " + roadProposals.size() + " road responses");
                 processRoadProposals();
@@ -496,9 +486,8 @@ public class LocomotiveAgent extends Agent {
             if (msg != null && currentComposition != null) {
                 String sender = msg.getSender().getLocalName();
 
-                // Проверяем, не получали ли мы уже ответ от этой дороги
                 if (roadProposals.containsKey(sender)) {
-                    return; // Уже обработали этот ответ
+                    return;
                 }
 
                 if (msg.getPerformative() == ACLMessage.PROPOSE) {
@@ -513,7 +502,6 @@ public class LocomotiveAgent extends Agent {
                     System.out.println(agentId + ": Received proposal from road " + sender +
                             " with time: " + availableTime + " for cargoes: " + cargoIds);
 
-                    // Проверяем, получили ли все ответы
                     if (roadProposals.size() >= expectedRoadResponses && expectedRoadResponses > 0) {
                         System.out.println(agentId + ": Received all " + roadProposals.size() + " road responses");
                         processRoadProposals();
@@ -523,7 +511,6 @@ public class LocomotiveAgent extends Agent {
                     roadProposals.put(sender, proposal);
                     System.out.println(agentId + ": Received refusal from road " + sender);
 
-                    // Проверяем, получили ли все ответы
                     if (roadProposals.size() >= expectedRoadResponses && expectedRoadResponses > 0) {
                         System.out.println(agentId + ": Received all " + roadProposals.size() + " road responses");
                         processRoadProposals();
@@ -546,8 +533,9 @@ public class LocomotiveAgent extends Agent {
                     System.out.println(agentId + ": Selected road " + bestRoadProposal.getResourceId() +
                             " with time: " + bestRoadProposal.getAvailableTime());
 
-                    // КРУГ 1: Отправляем предложения всем вагонам в составе
                     for (WagonRequest wagon : currentComposition.wagons) {
+                        String key = wagon.wagonId + "_" + wagon.cargoId;
+                        pendingWagonRequests.remove(key);
                         ACLMessage reply = wagon.originalMessage.createReply();
                         reply.setPerformative(ACLMessage.PROPOSE);
                         reply.setContent(bestRoadProposal.getAvailableTime().getTime() + ":" +
@@ -558,7 +546,6 @@ public class LocomotiveAgent extends Agent {
                                 " at time: " + bestRoadProposal.getAvailableTime());
                     }
 
-                    // Очищаем предложения дорог после обработки
                     roadProposals.clear();
                     roadAgentsContacted.clear();
                     expectedRoadResponses = 0;
@@ -590,18 +577,15 @@ public class LocomotiveAgent extends Agent {
                     String cargoId = parts[0];
                     String toStation = parts[1];
 
-                    // Находим вагон по cargoId в текущем составе
                     WagonRequest wagonRequest = null;
                     if (currentComposition != null) {
                         wagonRequest = currentComposition.getWagonByCargoId(cargoId);
                     }
 
                     if (wagonRequest != null) {
-                        // Запоминаем принявшего вагона
                         acceptedWagons.put(wagonRequest.wagonId, new WagonAcceptance(wagonRequest.wagonId, cargoId, toStation));
                         currentComposition.markWagonAccepted(wagonRequest.wagonId);
 
-                        // Удаляем запрос из pendingWagonRequests
                         String key = wagonRequest.wagonId + "_" + wagonRequest.cargoId;
                         pendingWagonRequests.remove(key);
 
@@ -610,7 +594,6 @@ public class LocomotiveAgent extends Agent {
                                 ". Accepted wagons: " + acceptedWagons.size() +
                                 "/" + (currentComposition != null ? currentComposition.wagons.size() : 0));
 
-                        // Если это первый принявший вагон, начинаем ожидание других
                         if (!waitingForWagonAcceptances && acceptedWagons.size() == 1) {
                             waitingForWagonAcceptances = true;
                             wagonAcceptStartTime = System.currentTimeMillis();
@@ -618,7 +601,6 @@ public class LocomotiveAgent extends Agent {
                                     WAGON_ACCEPT_TIMEOUT + "ms)");
                         }
 
-                        // Проверяем, все ли вагоны приняли или пора отправлять
                         checkAndSendRoadAcceptance();
                     } else {
                         System.out.println(agentId + ": Received ACCEPT_PROPOSAL for cargo " +
@@ -634,21 +616,17 @@ public class LocomotiveAgent extends Agent {
             long currentTime = System.currentTimeMillis();
             boolean shouldSend = false;
 
-            // 1. Проверяем таймаут
             if (currentTime - wagonAcceptStartTime > WAGON_ACCEPT_TIMEOUT) {
                 System.out.println(agentId + ": Wagon acceptance timeout reached");
                 shouldSend = true;
             }
 
-            // 2. Проверяем, все ли вагоны из состава ответили
             if (currentComposition.allWagonsAccepted()) {
                 System.out.println(agentId + ": All wagons have accepted");
                 shouldSend = true;
             }
 
-            // 3. Проверяем, есть ли хотя бы один вагон и прошло достаточно времени
             if (acceptedWagons.size() > 0 && currentTime - wagonAcceptStartTime > 5000) {
-                // Ждем минимум 5 секунд после первого принятия
                 shouldSend = true;
             }
 
@@ -664,7 +642,6 @@ public class LocomotiveAgent extends Agent {
                 return;
             }
 
-            // Формируем списки принявших вагонов и грузов
             StringBuilder acceptedWagonIds = new StringBuilder();
             StringBuilder acceptedCargoIds = new StringBuilder();
 
@@ -677,7 +654,6 @@ public class LocomotiveAgent extends Agent {
                 acceptedCargoIds.append(acceptance.cargoId);
             }
 
-            // Отправляем ACCEPT_PROPOSAL дороге
             ACLMessage acceptMsg = new ACLMessage(ACLMessage.ACCEPT_PROPOSAL);
             acceptMsg.addReceiver(new jade.core.AID(bestRoadProposal.getAgentId(),
                     jade.core.AID.ISLOCALNAME));
@@ -716,31 +692,11 @@ public class LocomotiveAgent extends Agent {
                     String wagonIds = parts[3];
                     String cargoIds = parts[4];
 
-                    // Резервируем время для локомотива
                     scheduleData.reserveTimeSlot(departureTime, arrivalTime);
 
                     System.out.println("✅ " + agentId + ": Schedule FINALIZED: " + scheduleId +
                             ", departure: " + departureTime + ", arrival: " + arrivalTime);
 
-                    // Пересылаем подтверждение вагонам
-                    String[] wagonArray = wagonIds.split(",");
-                    String[] cargoArray = cargoIds.split(",");
-
-                    for (int i = 0; i < wagonArray.length; i++) {
-                        String wagonId = wagonArray[i];
-                        String cargoId = cargoArray.length > i ? cargoArray[i] : "";
-
-                        ACLMessage wagonMsg = new ACLMessage(ACLMessage.INFORM);
-                        wagonMsg.addReceiver(new jade.core.AID(wagonId, jade.core.AID.ISLOCALNAME));
-                        wagonMsg.setContent("SCHEDULE_FINALIZED:" + scheduleId + ":" +
-                                departureTime.getTime() + ":" + arrivalTime.getTime() + ":" +
-                                cargoId);
-                        myAgent.send(wagonMsg);
-                        System.out.println(agentId + ": Forwarded schedule to wagon " + wagonId +
-                                " for cargo " + cargoId);
-                    }
-
-                    // Обновляем состояние локомотива
                     if (currentComposition != null) {
                         locomotive.setCurrentStation(currentComposition.toStation);
                     }
@@ -763,12 +719,6 @@ public class LocomotiveAgent extends Agent {
         protected void onTick() {
             long currentTime = System.currentTimeMillis();
 
-            // Очищаем старые записи из processedWagonRequests (старше 5 минут)
-            if (!processedWagonRequests.isEmpty()) {
-                // На практике здесь можно реализовать очистку по времени,
-                // но для простоты очищаем после завершения состава
-            }
-
             if (!pendingWagonRequests.isEmpty()) {
                 Iterator<Map.Entry<String, WagonRequest>> pendingIterator = pendingWagonRequests.entrySet().iterator();
 
@@ -790,7 +740,6 @@ public class LocomotiveAgent extends Agent {
                 }
             }
 
-            // Проверяем, не зависли ли мы в ожидании принятия вагонов
             if (waitingForWagonAcceptances &&
                     (currentTime - wagonAcceptStartTime) > (WAGON_ACCEPT_TIMEOUT + 5000)) {
                 System.out.println(agentId + ": Stuck waiting for wagon acceptances, resetting state");
@@ -816,13 +765,12 @@ public class LocomotiveAgent extends Agent {
     }
 
     private void resetCompositionState() {
-        // Отправляем отказы оставшимся вагонам в составе, которые не ответили
         if (currentComposition != null) {
             for (WagonRequest wagon : currentComposition.wagons) {
                 String key = wagon.wagonId + "_" + wagon.cargoId;
                 pendingWagonRequests.remove(key);
+                processedWagonRequests.remove(key);
 
-                // Если вагон не принял предложение, отправляем отказ
                 if (!wagon.isAccepted && wagon.originalMessage != null) {
                     sendRefusal(wagon.originalMessage, wagon.cargoId, "COMPOSITION_CANCELLED");
                 }
