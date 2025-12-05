@@ -30,9 +30,9 @@ public class WagonAgent extends Agent {
     private long startTime;
 
     private Map<String, CargoRequest> pendingRequests = new HashMap<>();
-    private final long RETRY_INTERVAL = 15000;
+    private final long RETRY_INTERVAL = 4000;
     private final int MAX_RETRIES = 3;
-    private final long REQUEST_TIMEOUT = 60000;
+    private final long REQUEST_TIMEOUT = 15000;
 
     private class CargoRequest {
         String cargoId;

@@ -10,7 +10,7 @@ import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import models.Route;
 import models.ScheduleData;
-import models.Proposal;
+import java.util.Arrays;
 import models.TimeSlot;
 import utils.DataLoader;
 import utils.TimeUtils;
@@ -391,8 +391,21 @@ public class RoadAgent extends Agent {
         }
 
         private LocomotiveRequest findRequestByCargoIds(String cargoIds) {
+            // Нормализуем порядок cargoIds для поиска
+            String[] requestedCargoArray = cargoIds.split(",");
+            Arrays.sort(requestedCargoArray);
+            String normalizedRequestedCargoIds = String.join(",", requestedCargoArray);
+
             for (LocomotiveRequest request : pendingRequests.values()) {
-                if (request.cargoIds.equals(cargoIds) && request.isProcessed) {
+                if (!request.isProcessed) {
+                    continue;
+                }
+                // Нормализуем и cargoIds из запроса
+                String[] requestCargoArray = request.cargoIds.split(",");
+                Arrays.sort(requestCargoArray);
+                String normalizedRequestCargoIds = String.join(",", requestCargoArray);
+
+                if (normalizedRequestCargoIds.equals(normalizedRequestedCargoIds)) {
                     return request;
                 }
             }

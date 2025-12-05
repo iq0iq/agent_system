@@ -53,6 +53,16 @@
           "currentStation": "ST2",
           "compatibleCargoTypes": ["liquid", "gas"]
         }
+      },
+      {
+        "agentId": "WagonAgent3",
+        "wagon": {
+          "id": "W3",
+          "type": "bulk",
+          "capacity": 60.0,
+          "currentStation": "ST1",
+          "compatibleCargoTypes": ["bulk", "granular"]
+        }
       }
     ],
     "locomotive": [

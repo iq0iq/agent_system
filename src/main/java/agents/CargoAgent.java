@@ -24,10 +24,12 @@ public class CargoAgent extends Agent {
     private long startTime;
     private boolean isProcessing = false;
     private boolean requestSent = false;
+    private Date simulationStartTime;
 
     protected void setup() {
         agentId = (String) getArguments()[0];
         cargo = DataLoader.getCargoForAgent(agentId);
+        simulationStartTime = DataLoader.getSimulationStartTime();
 
         if (cargo == null) {
             System.out.println(agentId + ": No cargo found!");
@@ -50,7 +52,7 @@ public class CargoAgent extends Agent {
         System.out.println(agentId + " started with cargo: " + cargo.getId() +
                 " at station: " + cargo.getFromStation());
 
-        addBehaviour(new RequestWagonsBehaviour(this, 3000));
+        addBehaviour(new RequestWagonsBehaviour(this, 4000));
         addBehaviour(new WaitForWagonResponsesBehaviour(this, 100));
         addBehaviour(new ScheduleConfirmationBehaviour(this, 100));
     }
@@ -115,14 +117,6 @@ public class CargoAgent extends Agent {
                 processProposals();
                 return;
             }
-
-            // УДАЛЕНО: Таймаут ожидания ответов от вагонов
-            // if ((System.currentTimeMillis() - startTime) > TIMEOUT) {
-            //     System.out.println(agentId + ": Timeout waiting for wagon responses. Received " +
-            //             wagonProposals.size() + " of " + expectedWagonResponses);
-            //     processProposals();
-            //     return;
-            // }
 
             ACLMessage msg = receive(mt);
 
