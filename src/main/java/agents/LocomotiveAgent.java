@@ -420,13 +420,15 @@ public class LocomotiveAgent extends Agent {
                             currentComposition.totalWeight + ":" +
                             locomotive.getId() + ":" +
                             currentComposition.getWagonIds() + ":" +
-                            trainAvailableTime.getTime());
+                            trainAvailableTime.getTime() + ":" + // Добавляем время
+                            locomotive.getSpeed()); // Добавляем скорость локомотива
                     send(msg);
                     System.out.println(agentId + ": Sent composition request to road: " +
                             desc.getName().getLocalName() +
                             " with departure time: " + trainAvailableTime +
                             ", cargoes: " + currentComposition.getCargoIds() +
-                            ", wagons: " + currentComposition.getWagonIds());
+                            ", wagons: " + currentComposition.getWagonIds() +
+                            ", locomotive speed: " + locomotive.getSpeed() + " km/h");
                 }
                 expectedRoadResponses = roadAgents.length;
                 startTime = System.currentTimeMillis();
@@ -442,6 +444,7 @@ public class LocomotiveAgent extends Agent {
             resetCompositionState();
         }
     }
+
 
     private Date calculateLocomotiveAvailableTime(Date requestedTime) {
         if (scheduleData.getSchedule().isEmpty()) {

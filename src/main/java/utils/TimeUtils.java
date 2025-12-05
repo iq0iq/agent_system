@@ -55,12 +55,23 @@ public class TimeUtils {
 
     /**
      * Рассчитывает продолжительность поездки в минутах
-     * Предполагаем среднюю скорость 60 км/ч
+     * с учетом скорости локомотива
      */
-    public static int calculateTripDuration(double distance) {
+    public static int calculateTripDuration(double distance, double locomotiveSpeed) {
         // distance в километрах
         // время в минутах = (расстояние / скорость) * 60
-        return (int) Math.ceil((distance / 60.0) * 60);
+        if (locomotiveSpeed <= 0) {
+            locomotiveSpeed = 60.0; // значение по умолчанию, если скорость не указана
+        }
+        return (int) Math.ceil((distance / locomotiveSpeed) * 60);
+    }
+
+    /**
+     * Рассчитывает продолжительность поездки в минутах
+     * с использованием средней скорости по умолчанию (60 км/ч)
+     */
+    public static int calculateTripDuration(double distance) {
+        return calculateTripDuration(distance, 60.0);
     }
 
     /**

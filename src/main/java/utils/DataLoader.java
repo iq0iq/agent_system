@@ -63,7 +63,14 @@ public class DataLoader {
         for (var agent : locoAgents) {
             JsonObject agentObj = agent.getAsJsonObject();
             if (agentObj.get("agentId").getAsString().equals(agentId)) {
-                return gson.fromJson(agentObj.get("locomotive"), Locomotive.class);
+                Locomotive locomotive = gson.fromJson(agentObj.get("locomotive"), Locomotive.class);
+
+                // Устанавливаем скорость по умолчанию, если она не указана
+                if (locomotive.getSpeed() == 0) {
+                    locomotive.setSpeed(60.0); // значение по умолчанию 60 км/ч
+                }
+
+                return locomotive;
             }
         }
         return null;

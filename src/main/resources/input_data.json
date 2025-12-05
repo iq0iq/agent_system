@@ -31,6 +31,16 @@
           "fromStation": "ST1",
           "toStation": "ST2"
         }
+      },
+      {
+        "agentId": "CargoAgent4",
+        "cargo": {
+          "id": "C4",
+          "type": "liquid",
+          "weight": 40.0,
+          "fromStation": "ST3",
+          "toStation": "ST2"
+        }
       }
     ],
     "wagon": [
@@ -72,7 +82,8 @@
           "id": "L1",
           "type": "electric",
           "currentStation": "ST1",
-          "maxWeightCapacity": 200.0
+          "maxWeightCapacity": 200.0,
+          "speed": 80.0
         }
       },
       {
@@ -81,7 +92,8 @@
           "id": "L2",
           "type": "diesel",
           "currentStation": "ST2",
-          "maxWeightCapacity": 150.0
+          "maxWeightCapacity": 150.0,
+          "speed": 60.0
         }
       }
     ],
@@ -107,6 +119,14 @@
         "route": {
           "fromStation": "ST1",
           "toStation": "ST3",
+          "distance": 420.0
+        }
+      },
+      {
+        "agentId": "RoadAgent4",
+        "route": {
+          "fromStation": "ST3",
+          "toStation": "ST2",
           "distance": 420.0
         }
       }

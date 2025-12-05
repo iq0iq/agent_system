@@ -40,10 +40,12 @@ public class RoadAgent extends Agent {
         long requestTime;
         boolean isProcessed;
         Date proposedTime;
+        double locomotiveSpeed; // Добавлено: скорость локомотива
 
         LocomotiveRequest(String cargoIds, String fromStation, String toStation,
                           double totalWeight, String locomotiveId, String wagonIds,
-                          Date trainAvailableTime, ACLMessage originalMessage) {
+                          Date trainAvailableTime, ACLMessage originalMessage,
+                          double locomotiveSpeed) { // Добавлен параметр скорости
             this.cargoIds = cargoIds;
             this.fromStation = fromStation;
             this.toStation = toStation;
@@ -52,6 +54,7 @@ public class RoadAgent extends Agent {
             this.wagonIds = wagonIds;
             this.trainAvailableTime = trainAvailableTime;
             this.originalMessage = originalMessage;
+            this.locomotiveSpeed = locomotiveSpeed; // Сохраняем скорость
             this.requestTime = System.currentTimeMillis();
             this.isProcessed = false;
             this.proposedTime = null;
@@ -142,6 +145,16 @@ public class RoadAgent extends Agent {
                 String wagonIds = parts[5];
                 Date trainAvailableTime = new Date(Long.parseLong(parts[6]));
 
+                // Получаем скорость локомотива (если передана, иначе используем 60 км/ч по умолчанию)
+                double locomotiveSpeed = 60.0; // значение по умолчанию
+                if (parts.length >= 8) {
+                    try {
+                        locomotiveSpeed = Double.parseDouble(parts[7]);
+                    } catch (NumberFormatException e) {
+                        System.out.println(agentId + ": Invalid locomotive speed format, using default 60 km/h");
+                    }
+                }
+
                 if (!route.getFromStation().equals(fromStation) || !route.getToStation().equals(toStation)) {
                     System.out.println(agentId + ": Route mismatch for request from " +
                             fromStation + " to " + toStation);
@@ -150,14 +163,15 @@ public class RoadAgent extends Agent {
                 }
 
                 LocomotiveRequest request = new LocomotiveRequest(cargoIds, fromStation, toStation,
-                        totalWeight, locomotiveId, wagonIds, trainAvailableTime, msg);
+                        totalWeight, locomotiveId, wagonIds, trainAvailableTime, msg, locomotiveSpeed);
 
                 String requestId = request.getRequestId();
                 pendingRequests.put(requestId, request);
 
                 System.out.println(agentId + ": Received request for cargoes " + cargoIds +
                         " from locomotive " + locomotiveId + " with wagons " + wagonIds +
-                        ", requested time: " + trainAvailableTime);
+                        ", requested time: " + trainAvailableTime +
+                        ", locomotive speed: " + locomotiveSpeed + " km/h");
 
                 processRequest(request);
             } catch (NumberFormatException e) {
@@ -172,7 +186,8 @@ public class RoadAgent extends Agent {
 
         private void processRequest(LocomotiveRequest request) {
             try {
-                int tripDuration = TimeUtils.calculateTripDuration(route.getDistance());
+                // Используем скорость локомотива для расчета времени поездки
+                int tripDuration = TimeUtils.calculateTripDuration(route.getDistance(), request.locomotiveSpeed);
 
                 Date availableTime = scheduleData.findNearestAvailableTimeAfter(
                         request.trainAvailableTime, tripDuration);
@@ -193,6 +208,7 @@ public class RoadAgent extends Agent {
                         " - requested time: " + request.trainAvailableTime +
                         ", proposed time: " + optimizedTime +
                         ", duration: " + tripDuration + " min" +
+                        ", locomotive speed: " + request.locomotiveSpeed + " km/h" +
                         ", cargoes: " + request.cargoIds);
 
                 request.isProcessed = true;
@@ -299,7 +315,8 @@ public class RoadAgent extends Agent {
                     return;
                 }
 
-                int tripDuration = TimeUtils.calculateTripDuration(route.getDistance());
+                // Используем скорость локомотива из запроса
+                int tripDuration = TimeUtils.calculateTripDuration(route.getDistance(), request.locomotiveSpeed);
 
                 Date departureTime;
                 if (requestedDepartureTime != null &&
@@ -334,7 +351,9 @@ public class RoadAgent extends Agent {
                         ", wagons: " + request.wagonIds +
                         ", cargoes: " + request.cargoIds +
                         ", departure: " + departureTime +
-                        ", arrival: " + arrivalTime);
+                        ", arrival: " + arrivalTime +
+                        ", locomotive speed: " + request.locomotiveSpeed + " km/h" +
+                        ", trip duration: " + tripDuration + " min");
 
                 // 1. Отправляем подтверждение локомотиву
                 ACLMessage locomotiveConfirmMsg = new ACLMessage(ACLMessage.INFORM);
@@ -423,6 +442,7 @@ public class RoadAgent extends Agent {
                 scheduleDataMap.put("cargoIds", request.cargoIds);
                 scheduleDataMap.put("wagonIds", request.wagonIds);
                 scheduleDataMap.put("locomotiveId", request.locomotiveId);
+                scheduleDataMap.put("locomotiveSpeed", request.locomotiveSpeed);
                 scheduleDataMap.put("totalWeight", request.totalWeight);
                 scheduleDataMap.put("trainAvailableTime", request.trainAvailableTime);
                 scheduleDataMap.put("departureTime", departureTime);
@@ -472,10 +492,12 @@ public class RoadAgent extends Agent {
                 System.out.println("Cargoes: " + scheduleData.get("cargoIds"));
                 System.out.println("Wagons: " + scheduleData.get("wagonIds"));
                 System.out.println("Locomotive: " + scheduleData.get("locomotiveId"));
+                System.out.println("Locomotive Speed: " + scheduleData.get("locomotiveSpeed") + " km/h");
                 System.out.println("Composition size: " + scheduleData.get("compositionSize"));
                 System.out.println("Train available at: " + scheduleData.get("trainAvailableTime"));
                 System.out.println("Departure: " + scheduleData.get("departureTime"));
                 System.out.println("Arrival: " + scheduleData.get("arrivalTime"));
+                System.out.println("Duration: " + scheduleData.get("duration"));
                 System.out.println("======================");
 
             } catch (IOException e) {

@@ -3,18 +3,21 @@ package models;
 public class Locomotive {
     private String id, type, currentStation;
     private double maxWeightCapacity;
+    private double speed; // км/ч
     private boolean available = true;
 
     public String getId() { return id; }
     public String getType() { return type; }
     public String getCurrentStation() { return currentStation; }
     public double getMaxWeightCapacity() { return maxWeightCapacity; }
+    public double getSpeed() { return speed; }
     public boolean isAvailable() { return available; }
 
     public void setId(String id) { this.id = id; }
     public void setType(String type) { this.type = type; }
     public void setCurrentStation(String currentStation) { this.currentStation = currentStation; }
     public void setMaxWeightCapacity(double maxWeightCapacity) { this.maxWeightCapacity = maxWeightCapacity; }
+    public void setSpeed(double speed) { this.speed = speed; }
     public void setAvailable(boolean available) { this.available = available; }
 
     public boolean canPullWeight(double weight) {
