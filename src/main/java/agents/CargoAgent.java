@@ -173,7 +173,10 @@ public class CargoAgent extends Agent {
     private class ScheduleConfirmationBehaviour extends TickerBehaviour {
         private MessageTemplate mt = MessageTemplate.or(
                 MessageTemplate.MatchPerformative(ACLMessage.CONFIRM),
-                MessageTemplate.MatchPerformative(ACLMessage.INFORM)
+                MessageTemplate.or(
+                        MessageTemplate.MatchPerformative(ACLMessage.INFORM),
+                        MessageTemplate.MatchPerformative(ACLMessage.REJECT_PROPOSAL)
+                )
         );
 
         public ScheduleConfirmationBehaviour(Agent a, long period) {
@@ -209,6 +212,21 @@ public class CargoAgent extends Agent {
                     } else {
                         System.err.println(agentId + ": Invalid SCHEDULE_FINALIZED format: " + content);
                     }
+                } else if (content.startsWith("ROAD_REJECTED:")) {
+                    // Обработка отказа от дороги
+                    String[] parts = content.substring("ROAD_REJECTED:".length()).split(":");
+                    String reason = parts[0];
+                    String locomotiveId = parts.length > 1 ? parts[1] : "";
+
+                    System.out.println("❌ " + agentId + ": Road rejected schedule. Reason: " +
+                            reason + ", locomotive: " + locomotiveId);
+
+                    // Сбрасываем состояние, чтобы начать новый поиск
+                    requestSent = false;
+                    isProcessing = false;
+                    bestWagonProposal = null;
+
+                    System.out.println(agentId + ": Will retry scheduling cargo");
                 }
             }
         }

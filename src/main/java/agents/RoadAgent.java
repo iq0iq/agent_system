@@ -10,7 +10,6 @@ import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import models.Route;
 import models.ScheduleData;
-import java.util.Arrays;
 import models.TimeSlot;
 import utils.DataLoader;
 import utils.TimeUtils;
@@ -25,45 +24,6 @@ public class RoadAgent extends Agent {
     private Route route;
     private ScheduleData scheduleData;
     private Gson gson = new GsonBuilder().setPrettyPrinting().create();
-
-    private Map<String, LocomotiveRequest> pendingRequests = new HashMap<>();
-
-    private class LocomotiveRequest {
-        String cargoIds;
-        String fromStation;
-        String toStation;
-        double totalWeight;
-        String locomotiveId;
-        String wagonIds;
-        Date trainAvailableTime;
-        ACLMessage originalMessage;
-        long requestTime;
-        boolean isProcessed;
-        Date proposedTime;
-        double locomotiveSpeed; // Добавлено: скорость локомотива
-
-        LocomotiveRequest(String cargoIds, String fromStation, String toStation,
-                          double totalWeight, String locomotiveId, String wagonIds,
-                          Date trainAvailableTime, ACLMessage originalMessage,
-                          double locomotiveSpeed) { // Добавлен параметр скорости
-            this.cargoIds = cargoIds;
-            this.fromStation = fromStation;
-            this.toStation = toStation;
-            this.totalWeight = totalWeight;
-            this.locomotiveId = locomotiveId;
-            this.wagonIds = wagonIds;
-            this.trainAvailableTime = trainAvailableTime;
-            this.originalMessage = originalMessage;
-            this.locomotiveSpeed = locomotiveSpeed; // Сохраняем скорость
-            this.requestTime = System.currentTimeMillis();
-            this.isProcessed = false;
-            this.proposedTime = null;
-        }
-
-        String getRequestId() {
-            return locomotiveId + "_" + wagonIds + "_" + trainAvailableTime.getTime();
-        }
-    }
 
     protected void setup() {
         try {
@@ -92,7 +52,6 @@ public class RoadAgent extends Agent {
 
             addBehaviour(new LocomotiveRequestBehaviour(this, 100));
             addBehaviour(new AcceptProposalBehaviour(this, 100));
-            addBehaviour(new RequestCleanupBehaviour(this, 60000));
 
             System.out.println(agentId + " started for route: " + route.getFromStation() +
                     " -> " + route.getToStation());
@@ -162,18 +121,27 @@ public class RoadAgent extends Agent {
                     return;
                 }
 
-                LocomotiveRequest request = new LocomotiveRequest(cargoIds, fromStation, toStation,
-                        totalWeight, locomotiveId, wagonIds, trainAvailableTime, msg, locomotiveSpeed);
+                // Рассчитываем время поездки на основе скорости локомотива
+                int tripDuration = TimeUtils.calculateTripDuration(route.getDistance(), locomotiveSpeed);
 
-                String requestId = request.getRequestId();
-                pendingRequests.put(requestId, request);
+                // Находим ближайшее доступное время
+                Date availableTime = scheduleData.findNearestAvailableTimeAfter(trainAvailableTime, tripDuration);
 
-                System.out.println(agentId + ": Received request for cargoes " + cargoIds +
-                        " from locomotive " + locomotiveId + " with wagons " + wagonIds +
-                        ", requested time: " + trainAvailableTime +
-                        ", locomotive speed: " + locomotiveSpeed + " km/h");
+                // Отправляем предложение
+                ACLMessage reply = msg.createReply();
+                reply.setPerformative(ACLMessage.PROPOSE);
+                reply.setContent(availableTime.getTime() + ":" +
+                        "ROUTE_" + fromStation + "_" + toStation + ":" +
+                        cargoIds);
+                myAgent.send(reply);
 
-                processRequest(request);
+                System.out.println(agentId + ": Sent proposal to " +
+                        msg.getSender().getLocalName() +
+                        " - requested time: " + trainAvailableTime +
+                        ", proposed time: " + availableTime +
+                        ", duration: " + tripDuration + " min" +
+                        ", locomotive speed: " + locomotiveSpeed + " km/h" +
+                        ", cargoes: " + cargoIds);
             } catch (NumberFormatException e) {
                 System.err.println(agentId + ": Error parsing number in LOCOMOTIVE_REQUEST: " + e.getMessage());
                 sendRefusal(msg, "INVALID_NUMBER_FORMAT");
@@ -181,41 +149,6 @@ public class RoadAgent extends Agent {
                 System.err.println(agentId + ": Error handling locomotive request: " + e.getMessage());
                 e.printStackTrace();
                 sendRefusal(msg, "INTERNAL_ERROR");
-            }
-        }
-
-        private void processRequest(LocomotiveRequest request) {
-            try {
-                // Используем скорость локомотива для расчета времени поездки
-                int tripDuration = TimeUtils.calculateTripDuration(route.getDistance(), request.locomotiveSpeed);
-
-                Date availableTime = scheduleData.findNearestAvailableTimeAfter(
-                        request.trainAvailableTime, tripDuration);
-
-                Date optimizedTime = optimizeScheduleForComposition(request, availableTime, tripDuration);
-
-                request.proposedTime = optimizedTime;
-
-                ACLMessage reply = request.originalMessage.createReply();
-                reply.setPerformative(ACLMessage.PROPOSE);
-                reply.setContent(optimizedTime.getTime() + ":" +
-                        "ROUTE_" + request.fromStation + "_" + request.toStation + ":" +
-                        request.cargoIds);
-                myAgent.send(reply);
-
-                System.out.println(agentId + ": Sent proposal to " +
-                        request.originalMessage.getSender().getLocalName() +
-                        " - requested time: " + request.trainAvailableTime +
-                        ", proposed time: " + optimizedTime +
-                        ", duration: " + tripDuration + " min" +
-                        ", locomotive speed: " + request.locomotiveSpeed + " km/h" +
-                        ", cargoes: " + request.cargoIds);
-
-                request.isProcessed = true;
-            } catch (Exception e) {
-                System.err.println(agentId + ": Error processing request: " + e.getMessage());
-                e.printStackTrace();
-                sendRefusal(request.originalMessage, "ERROR_PROCESSING_REQUEST");
             }
         }
 
@@ -228,42 +161,6 @@ public class RoadAgent extends Agent {
             } catch (Exception e) {
                 System.err.println(agentId + ": Error sending refusal: " + e.getMessage());
             }
-        }
-
-        private Date optimizeScheduleForComposition(LocomotiveRequest newRequest, Date suggestedTime, int tripDuration) {
-            try {
-                List<TimeSlot> schedule = scheduleData.getSchedule();
-
-                for (TimeSlot slot : schedule) {
-                    if (!slot.isAvailable() && slot.getEndTime().after(newRequest.trainAvailableTime)) {
-                        Date potentialStart = slot.getEndTime();
-                        long delay = (potentialStart.getTime() - newRequest.trainAvailableTime.getTime()) / 60000;
-
-                        if (delay <= 30) {
-                            Date potentialEnd = TimeUtils.addMinutes(potentialStart, tripDuration);
-
-                            boolean conflicts = false;
-                            for (TimeSlot otherSlot : schedule) {
-                                if (otherSlot != slot &&
-                                        potentialStart.before(otherSlot.getEndTime()) &&
-                                        potentialEnd.after(otherSlot.getStartTime())) {
-                                    conflicts = true;
-                                    break;
-                                }
-                            }
-
-                            if (!conflicts) {
-                                System.out.println(agentId + ": Optimized schedule - adding composition after existing slot at " + potentialStart);
-                                return potentialStart;
-                            }
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                System.err.println(agentId + ": Error in optimizeScheduleForComposition: " + e.getMessage());
-            }
-
-            return suggestedTime;
         }
     }
 
@@ -294,65 +191,72 @@ public class RoadAgent extends Agent {
             try {
                 String[] parts = content.substring("ACCEPT_PROPOSAL:".length()).split(":");
 
-                if (parts.length < 3) {
-                    System.err.println(agentId + ": Invalid ACCEPT_PROPOSAL format. Expected 3 parts, got " + parts.length);
+                // Новый формат ACCEPT_PROPOSAL должен содержать все необходимые данные:
+                // ACCEPT_PROPOSAL:cargoIds:fromStation:toStation:totalWeight:locomotiveId:wagonIds:trainAvailableTime:locomotiveSpeed:requestedDepartureTime
+
+                if (parts.length < 9) {
+                    System.err.println(agentId + ": Invalid ACCEPT_PROPOSAL format. Expected 9 parts, got " + parts.length);
+                    System.err.println("Content: " + content);
                     return;
                 }
 
                 String cargoIds = parts[0];
-                String toStation = parts[1];
-                Date requestedDepartureTime = new Date(Long.parseLong(parts[2]));
+                String fromStation = parts[1];
+                String toStation = parts[2];
+                double totalWeight = Double.parseDouble(parts[3]);
+                String locomotiveId = parts[4];
+                String wagonIds = parts[5];
+                Date trainAvailableTime = new Date(Long.parseLong(parts[6]));
+                double locomotiveSpeed = Double.parseDouble(parts[7]);
+                Date requestedDepartureTime = new Date(Long.parseLong(parts[8]));
 
-                LocomotiveRequest request = findRequestByCargoIds(cargoIds);
-
-                if (request == null) {
-                    System.err.println(agentId + ": No request found for cargoes " + cargoIds);
+                if (!route.getFromStation().equals(fromStation) || !route.getToStation().equals(toStation)) {
+                    System.err.println(agentId + ": Route mismatch for cargoes " + cargoIds);
                     return;
                 }
 
-                if (!request.toStation.equals(toStation)) {
-                    System.err.println(agentId + ": Station mismatch for cargoes " + cargoIds);
-                    return;
-                }
-
-                // Используем скорость локомотива из запроса
-                int tripDuration = TimeUtils.calculateTripDuration(route.getDistance(), request.locomotiveSpeed);
+                // Рассчитываем длительность поездки на основе скорости локомотива
+                int tripDuration = TimeUtils.calculateTripDuration(route.getDistance(), locomotiveSpeed);
 
                 Date departureTime;
-                if (requestedDepartureTime != null &&
-                        scheduleData.canAddTimeSlot(requestedDepartureTime,
-                                TimeUtils.addMinutes(requestedDepartureTime, tripDuration))) {
+                Date arrivalTime;
+
+                // Проверяем, доступен ли запрошенный слот
+                if (scheduleData.canAddTimeSlot(requestedDepartureTime,
+                        TimeUtils.addMinutes(requestedDepartureTime, tripDuration))) {
                     departureTime = requestedDepartureTime;
-                } else if (request.proposedTime != null) {
-                    departureTime = request.proposedTime;
                 } else {
-                    departureTime = scheduleData.findNearestAvailableTimeAfter(
-                            request.trainAvailableTime, tripDuration);
+                    // Ищем ближайшее доступное время
+                    departureTime = scheduleData.findNearestAvailableTimeAfter(trainAvailableTime, tripDuration);
                 }
 
-                Date arrivalTime = TimeUtils.addMinutes(departureTime, tripDuration);
+                arrivalTime = TimeUtils.addMinutes(departureTime, tripDuration);
 
+                // Резервируем слот
                 if (!scheduleData.reserveTimeSlot(departureTime, arrivalTime)) {
                     ACLMessage rejectMsg = msg.createReply();
                     rejectMsg.setPerformative(ACLMessage.REJECT_PROPOSAL);
                     rejectMsg.setContent("TIME_SLOT_UNAVAILABLE");
                     myAgent.send(rejectMsg);
+                    sendRejectionsToAll(locomotiveId, wagonIds, cargoIds, msg.getSender(), "TIME_SLOT_UNAVAILABLE");
                     System.out.println(agentId + ": Time slot unavailable for request: " + cargoIds);
                     return;
                 }
 
                 String scheduleId = "SCHEDULE_" + System.currentTimeMillis() + "_" +
-                        request.locomotiveId + "_" + request.wagonIds.hashCode();
+                        locomotiveId + "_" + wagonIds.hashCode();
 
-                createSchedule(scheduleId, departureTime, arrivalTime, tripDuration, request);
+                createSchedule(scheduleId, departureTime, arrivalTime, tripDuration,
+                        cargoIds, wagonIds, locomotiveId, locomotiveSpeed,
+                        trainAvailableTime, totalWeight);
 
                 System.out.println("✅ " + agentId + ": Schedule FINALIZED: " + scheduleId +
-                        " for locomotive: " + request.locomotiveId +
-                        ", wagons: " + request.wagonIds +
-                        ", cargoes: " + request.cargoIds +
+                        " for locomotive: " + locomotiveId +
+                        ", wagons: " + wagonIds +
+                        ", cargoes: " + cargoIds +
                         ", departure: " + departureTime +
                         ", arrival: " + arrivalTime +
-                        ", locomotive speed: " + request.locomotiveSpeed + " km/h" +
+                        ", locomotive speed: " + locomotiveSpeed + " km/h" +
                         ", trip duration: " + tripDuration + " min");
 
                 // 1. Отправляем подтверждение локомотиву
@@ -360,20 +264,20 @@ public class RoadAgent extends Agent {
                 locomotiveConfirmMsg.addReceiver(msg.getSender());
                 locomotiveConfirmMsg.setContent("SCHEDULE_FINALIZED:" + scheduleId + ":" +
                         departureTime.getTime() + ":" + arrivalTime.getTime() + ":" +
-                        request.wagonIds + ":" + request.cargoIds);
+                        wagonIds + ":" + cargoIds);
                 myAgent.send(locomotiveConfirmMsg);
                 System.out.println(agentId + ": Sent FINALIZED notification to locomotive " +
-                        request.locomotiveId);
+                        locomotiveId);
 
                 // 2. Отправляем подтверждение всем вагонам и грузам
-                String[] wagonIdsArray = request.wagonIds.split(",");
-                String[] cargoIdsArray = request.cargoIds.split(",");
+                String[] wagonIdsArray = wagonIds.split(",");
+                String[] cargoIdsArray = cargoIds.split(",");
 
                 for (int i = 0; i < wagonIdsArray.length; i++) {
-                    String wagonId = wagonIdsArray[i]; // Например "W2"
-                    String cargoId = (i < cargoIdsArray.length) ? cargoIdsArray[i] : ""; // Например "C2"
+                    String wagonId = wagonIdsArray[i];
+                    String cargoId = (i < cargoIdsArray.length) ? cargoIdsArray[i] : "";
 
-                    // ИСПРАВЛЕНИЕ: Преобразуем W2 -> WagonAgent2
+                    // Преобразуем W2 -> WagonAgent2
                     String wagonAgentName = "WagonAgent" + wagonId.substring(1);
 
                     // Вагону
@@ -400,7 +304,6 @@ public class RoadAgent extends Agent {
                     }
                 }
 
-                pendingRequests.remove(request.getRequestId());
             } catch (NumberFormatException e) {
                 System.err.println(agentId + ": Error parsing number in ACCEPT_PROPOSAL: " + e.getMessage());
             } catch (Exception e) {
@@ -409,47 +312,65 @@ public class RoadAgent extends Agent {
             }
         }
 
-        private LocomotiveRequest findRequestByCargoIds(String cargoIds) {
-            // Нормализуем порядок cargoIds для поиска
-            String[] requestedCargoArray = cargoIds.split(",");
-            Arrays.sort(requestedCargoArray);
-            String normalizedRequestedCargoIds = String.join(",", requestedCargoArray);
+        private void sendRejectionsToAll(String locomotiveId, String wagonIds, String cargoIds,
+                                         jade.core.AID locomotiveAID, String reason) {
+            try {
+                // 1. Отправляем отказ локомотиву (уже отправлен выше)
 
-            for (LocomotiveRequest request : pendingRequests.values()) {
-                if (!request.isProcessed) {
-                    continue;
-                }
-                // Нормализуем и cargoIds из запроса
-                String[] requestCargoArray = request.cargoIds.split(",");
-                Arrays.sort(requestCargoArray);
-                String normalizedRequestCargoIds = String.join(",", requestCargoArray);
+                // 2. Отправляем отказ всем вагонам
+                String[] wagonIdsArray = wagonIds.split(",");
+                String[] cargoIdsArray = cargoIds.split(",");
 
-                if (normalizedRequestCargoIds.equals(normalizedRequestedCargoIds)) {
-                    return request;
+                for (int i = 0; i < wagonIdsArray.length; i++) {
+                    String wagonId = wagonIdsArray[i];
+                    String cargoId = (i < cargoIdsArray.length) ? cargoIdsArray[i] : "";
+
+                    // Преобразуем W2 -> WagonAgent2
+                    String wagonAgentName = "WagonAgent" + wagonId.substring(1);
+
+                    // Вагону
+                    ACLMessage wagonRejectMsg = new ACLMessage(ACLMessage.REJECT_PROPOSAL);
+                    wagonRejectMsg.addReceiver(new jade.core.AID(wagonAgentName, jade.core.AID.ISLOCALNAME));
+                    wagonRejectMsg.setContent("ROAD_REJECTED:" + reason + ":" + cargoId + ":" + locomotiveId);
+                    myAgent.send(wagonRejectMsg);
+                    System.out.println(agentId + ": Sent REJECTION notification to wagon agent " +
+                            wagonAgentName + " (wagonId: " + wagonId + ") for cargo " + cargoId);
+
+                    // Грузу (если указан)
+                    if (!cargoId.isEmpty()) {
+                        String cargoAgentName = "CargoAgent" + cargoId.substring(1);
+
+                        ACLMessage cargoRejectMsg = new ACLMessage(ACLMessage.REJECT_PROPOSAL);
+                        cargoRejectMsg.addReceiver(new jade.core.AID(cargoAgentName, jade.core.AID.ISLOCALNAME));
+                        cargoRejectMsg.setContent("ROAD_REJECTED:" + reason + ":" + locomotiveId);
+                        myAgent.send(cargoRejectMsg);
+                        System.out.println(agentId + ": Sent REJECTION notification to cargo agent " +
+                                cargoAgentName + " (cargoId: " + cargoId + ")");
+                    }
                 }
+            } catch (Exception e) {
+                System.err.println(agentId + ": Error sending rejections: " + e.getMessage());
             }
-            return null;
         }
 
         private void createSchedule(String scheduleId, Date departureTime, Date arrivalTime,
-                                    int tripDuration, LocomotiveRequest request) {
+                                    int tripDuration, String cargoIds, String wagonIds,
+                                    String locomotiveId, double locomotiveSpeed,
+                                    Date trainAvailableTime, double totalWeight) {
             try {
                 Map<String, Object> scheduleDataMap = new HashMap<>();
                 scheduleDataMap.put("scheduleId", scheduleId);
                 scheduleDataMap.put("fromStation", route.getFromStation());
                 scheduleDataMap.put("toStation", route.getToStation());
-                scheduleDataMap.put("distance", route.getDistance());
-                scheduleDataMap.put("cargoIds", request.cargoIds);
-                scheduleDataMap.put("wagonIds", request.wagonIds);
-                scheduleDataMap.put("locomotiveId", request.locomotiveId);
-                scheduleDataMap.put("locomotiveSpeed", request.locomotiveSpeed);
-                scheduleDataMap.put("totalWeight", request.totalWeight);
-                scheduleDataMap.put("trainAvailableTime", request.trainAvailableTime);
+                scheduleDataMap.put("cargoIds", cargoIds);
+                scheduleDataMap.put("wagonIds", wagonIds);
+                scheduleDataMap.put("locomotiveId", locomotiveId);
+                scheduleDataMap.put("locomotiveSpeed", locomotiveSpeed);
+                scheduleDataMap.put("trainAvailableTime", trainAvailableTime);
+                scheduleDataMap.put("totalWeight", totalWeight);
                 scheduleDataMap.put("departureTime", departureTime);
                 scheduleDataMap.put("arrivalTime", arrivalTime);
-                scheduleDataMap.put("duration", tripDuration + " min");
-                scheduleDataMap.put("compositionSize", request.wagonIds.split(",").length);
-                scheduleDataMap.put("creationTime", new Date());
+                scheduleDataMap.put("duration", tripDuration);
                 scheduleDataMap.put("roadAgent", agentId);
 
                 saveScheduleToFile(scheduleDataMap);
@@ -459,30 +380,32 @@ public class RoadAgent extends Agent {
             }
         }
 
-        private void saveScheduleToFile(Map<String, Object> scheduleData) {
+        private synchronized void saveScheduleToFile(Map<String, Object> scheduleData) {
             try {
                 String filename = "schedules.json";
                 java.io.File file = new java.io.File(filename);
-                boolean fileExists = file.exists();
 
                 List<Map<String, Object>> schedules = new ArrayList<>();
 
-                if (fileExists && file.length() > 0) {
-                    try (java.io.FileReader reader = new java.io.FileReader(file)) {
-                        schedules = gson.fromJson(reader, List.class);
-                        if (schedules == null) {
+                // Блокировка на уровне метода для всех агентов в JVM
+                synchronized (RoadAgent.class) {
+                    if (file.exists() && file.length() > 0) {
+                        try (java.io.FileReader reader = new java.io.FileReader(file)) {
+                            schedules = gson.fromJson(reader, List.class);
+                            if (schedules == null) {
+                                schedules = new ArrayList<>();
+                            }
+                        } catch (Exception e) {
+                            System.err.println(agentId + ": Error reading existing schedules, starting fresh: " + e.getMessage());
                             schedules = new ArrayList<>();
                         }
-                    } catch (Exception e) {
-                        System.err.println(agentId + ": Error reading existing schedules, starting fresh: " + e.getMessage());
-                        schedules = new ArrayList<>();
                     }
-                }
 
-                schedules.add(scheduleData);
+                    schedules.add(scheduleData);
 
-                try (FileWriter writer = new FileWriter(filename)) {
-                    gson.toJson(schedules, writer);
+                    try (FileWriter writer = new FileWriter(filename)) {
+                        gson.toJson(schedules, writer);
+                    }
                 }
 
                 System.out.println("=== SCHEDULE SAVED ===");
@@ -493,11 +416,11 @@ public class RoadAgent extends Agent {
                 System.out.println("Wagons: " + scheduleData.get("wagonIds"));
                 System.out.println("Locomotive: " + scheduleData.get("locomotiveId"));
                 System.out.println("Locomotive Speed: " + scheduleData.get("locomotiveSpeed") + " km/h");
-                System.out.println("Composition size: " + scheduleData.get("compositionSize"));
+                System.out.println("Total Weight: " + scheduleData.get("totalWeight") + " tons");
                 System.out.println("Train available at: " + scheduleData.get("trainAvailableTime"));
                 System.out.println("Departure: " + scheduleData.get("departureTime"));
                 System.out.println("Arrival: " + scheduleData.get("arrivalTime"));
-                System.out.println("Duration: " + scheduleData.get("duration"));
+                System.out.println("Duration: " + scheduleData.get("duration") + " min");
                 System.out.println("======================");
 
             } catch (IOException e) {
@@ -505,35 +428,6 @@ public class RoadAgent extends Agent {
             } catch (Exception e) {
                 System.err.println(agentId + ": Unexpected error saving schedule: " + e.getMessage());
                 e.printStackTrace();
-            }
-        }
-    }
-
-    private class RequestCleanupBehaviour extends TickerBehaviour {
-        public RequestCleanupBehaviour(Agent a, long period) {
-            super(a, period);
-        }
-
-        protected void onTick() {
-            try {
-                long currentTime = System.currentTimeMillis();
-                List<String> toRemove = new ArrayList<>();
-
-                for (Map.Entry<String, LocomotiveRequest> entry : pendingRequests.entrySet()) {
-                    LocomotiveRequest request = entry.getValue();
-
-                    if ((currentTime - request.requestTime) > 300000) {
-                        System.out.println(agentId + ": Removing old request for cargoes " +
-                                request.cargoIds);
-                        toRemove.add(entry.getKey());
-                    }
-                }
-
-                for (String key : toRemove) {
-                    pendingRequests.remove(key);
-                }
-            } catch (Exception e) {
-                System.err.println(agentId + ": Error in RequestCleanupBehaviour: " + e.getMessage());
             }
         }
     }

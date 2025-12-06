@@ -41,6 +41,56 @@
           "fromStation": "ST3",
           "toStation": "ST2"
         }
+      },
+      {
+        "agentId": "CargoAgent5",
+        "cargo": {
+          "id": "C5",
+          "type": "liquid",
+          "weight": 30.0,
+          "fromStation": "ST2",
+          "toStation": "ST3"
+        }
+      },
+      {
+        "agentId": "CargoAgent6",
+        "cargo": {
+          "id": "C6",
+          "type": "bulk",
+          "weight": 10.0,
+          "fromStation": "ST2",
+          "toStation": "ST4"
+        }
+      },
+      {
+        "agentId": "CargoAgent7",
+        "cargo": {
+          "id": "C7",
+          "type": "bulk",
+          "weight": 30.0,
+          "fromStation": "ST2",
+          "toStation": "ST4"
+        }
+      },
+      {
+        "agentId": "CargoAgent8",
+        "cargo": {
+          "id": "C8",
+          "type": "water",
+          "weight": 50.0,
+          "fromStation": "ST1",
+          "toStation": "ST2"
+        }
+      },
+      {
+        "agentId": "CargoAgent9",
+        "cargo": {
+          "id": "C9",
+          "type": "container",
+          "weight": 20.0,
+          "fromStation": "ST3",
+          "toStation": "ST1"
+        }
       }
     ],
     "wagon": [
@@ -72,6 +122,36 @@
           "capacity": 60.0,
           "currentStation": "ST1",
           "compatibleCargoTypes": ["bulk", "granular"]
+        }
+      },
+      {
+        "agentId": "WagonAgent4",
+        "wagon": {
+          "id": "W4",
+          "type": "tank",
+          "capacity": 40.0,
+          "currentStation": "ST2",
+          "compatibleCargoTypes": ["liquid", "gas"]
+        }
+      },
+      {
+        "agentId": "WagonAgent5",
+        "wagon": {
+          "id": "W5",
+          "type": "water",
+          "capacity": 60.0,
+          "currentStation": "ST1",
+          "compatibleCargoTypes": ["water"]
+        }
+      },
+      {
+        "agentId": "WagonAgent6",
+        "wagon": {
+          "id": "W6",
+          "type": "flatcar",
+          "capacity": 30.0,
+          "currentStation": "ST3",
+          "compatibleCargoTypes": ["container", "refrigerated"]
         }
       }
     ],
@@ -129,6 +209,30 @@
           "toStation": "ST2",
           "distance": 420.0
         }
+      },
+      {
+        "agentId": "RoadAgent5",
+        "route": {
+          "fromStation": "ST2",
+          "toStation": "ST4",
+          "distance": 100.0
+        }
+      },
+      {
+        "agentId": "RoadAgent6",
+        "route": {
+          "fromStation": "ST1",
+          "toStation": "ST5",
+          "distance": 900.0
+        }
+      },
+      {
+        "agentId": "RoadAgent7",
+        "route": {
+          "fromStation": "ST3",
+          "toStation": "ST5",
+          "distance": 700.0
+        }
       }
     ]
   },
@@ -136,17 +240,27 @@
     {
       "id": "ST1",
       "name": "Moscow",
-      "location": "Moscow"
+      "location": "MSK"
     },
     {
       "id": "ST2",
       "name": "Saint Petersburg",
-      "location": "SPb"
+      "location": "SPB"
     },
     {
       "id": "ST3",
       "name": "Nizhny Novgorod",
       "location": "NN"
+    },
+    {
+      "id": "ST4",
+      "name": "Ufa",
+      "location": "UFA"
+    },
+    {
+      "id": "ST5",
+      "name": "Yekaterinburg",
+      "location": "YEK"
     }
   ]
 }

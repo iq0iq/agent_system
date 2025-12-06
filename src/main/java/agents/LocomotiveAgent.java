@@ -246,6 +246,7 @@ public class LocomotiveAgent extends Agent {
         addBehaviour(new WaitForRoadResponsesBehaviour(this, 100));
         addBehaviour(new AcceptProposalBehaviour(this, 100));
         addBehaviour(new ScheduleFinalizedBehaviour(this, 100));
+        addBehaviour(new RoadRejectionBehaviour(this, 100));
         addBehaviour(new CompositionTimerBehaviour(this, 2000));
 
         System.out.println(agentId + " started with locomotive: " + locomotive.getId() +
@@ -656,19 +657,26 @@ public class LocomotiveAgent extends Agent {
                 acceptedCargoIds.append(acceptance.cargoId);
             }
 
+            // Формируем сообщение со всеми необходимыми данными
+            String acceptContent = "ACCEPT_PROPOSAL:" +
+                    acceptedCargoIds.toString() + ":" +
+                    currentComposition.fromStation + ":" +
+                    currentComposition.toStation + ":" +
+                    currentComposition.totalWeight + ":" +
+                    currentComposition.locomotiveId + ":" +
+                    acceptedWagonIds.toString() + ":" +
+                    currentComposition.earliestDepartureTime.getTime() + ":" +
+                    locomotive.getSpeed() + ":" +
+                    bestRoadProposal.getAvailableTime().getTime();
+
             ACLMessage acceptMsg = new ACLMessage(ACLMessage.ACCEPT_PROPOSAL);
             acceptMsg.addReceiver(new jade.core.AID(bestRoadProposal.getAgentId(),
                     jade.core.AID.ISLOCALNAME));
-            acceptMsg.setContent("ACCEPT_PROPOSAL:" +
-                    acceptedCargoIds.toString() + ":" +
-                    currentComposition.toStation + ":" +
-                    bestRoadProposal.getAvailableTime().getTime());
+            acceptMsg.setContent(acceptContent);
             myAgent.send(acceptMsg);
 
             System.out.println("⏫ " + agentId + ": Sent ACCEPT_PROPOSAL to road " +
-                    bestRoadProposal.getAgentId() + " for " +
-                    acceptedWagons.size() + " wagons: " + acceptedWagonIds.toString() +
-                    " with cargoes: " + acceptedCargoIds.toString());
+                    bestRoadProposal.getAgentId() + " with all necessary data");
 
             currentComposition.isConfirmed = true;
         }
@@ -731,26 +739,26 @@ public class LocomotiveAgent extends Agent {
             }
 
             // Очистка старых запросов от вагонов
-            if (!pendingWagonRequests.isEmpty()) {
-                Iterator<Map.Entry<String, WagonRequest>> pendingIterator = pendingWagonRequests.entrySet().iterator();
-
-                while (pendingIterator.hasNext()) {
-                    Map.Entry<String, WagonRequest> entry = pendingIterator.next();
-                    WagonRequest request = entry.getValue();
-
-                    if ((currentTime - request.requestTime) > (COMPOSITION_TIMEOUT + 5000)) {
-                        System.out.println(agentId + ": Timeout for wagon " + request.wagonId +
-                                " with cargo " + request.cargoId + ", sending refusal");
-                        sendRefusal(request.originalMessage, request.cargoId, "COMPOSITION_TIMEOUT");
-                        processedWagonRequests.add(entry.getKey());
-                        pendingIterator.remove();
-                    }
-                }
-
-                if (pendingWagonRequests.isEmpty()) {
-                    resetCompositionState();
-                }
-            }
+//            if (!pendingWagonRequests.isEmpty()) {
+//                Iterator<Map.Entry<String, WagonRequest>> pendingIterator = pendingWagonRequests.entrySet().iterator();
+//
+//                while (pendingIterator.hasNext()) {
+//                    Map.Entry<String, WagonRequest> entry = pendingIterator.next();
+//                    WagonRequest request = entry.getValue();
+//
+//                    if ((currentTime - request.requestTime) > (COMPOSITION_TIMEOUT + 5000)) {
+//                        System.out.println(agentId + ": Timeout for wagon " + request.wagonId +
+//                                " with cargo " + request.cargoId + ", sending refusal");
+//                        sendRefusal(request.originalMessage, request.cargoId, "COMPOSITION_TIMEOUT");
+//                        processedWagonRequests.add(entry.getKey());
+//                        pendingIterator.remove();
+//                    }
+//                }
+//
+//                if (pendingWagonRequests.isEmpty()) {
+//                    resetCompositionState();
+//                }
+//            }
 
             // Очистка зависших ожиданий подтверждения от вагонов
             if (waitingForWagonAcceptances &&
@@ -765,6 +773,32 @@ public class LocomotiveAgent extends Agent {
             reply.setPerformative(ACLMessage.REFUSE);
             reply.setContent(cargoId + ":" + reason);
             myAgent.send(reply);
+        }
+    }
+
+    private class RoadRejectionBehaviour extends TickerBehaviour {
+        private MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.REJECT_PROPOSAL);
+
+        public RoadRejectionBehaviour(Agent a, long period) {
+            super(a, period);
+        }
+
+        protected void onTick() {
+            ACLMessage msg = myAgent.receive(mt);
+
+            if (msg != null) {
+                String content = msg.getContent();
+                System.out.println(agentId + ": Received REJECT_PROPOSAL from road: " + content);
+
+                // Проверяем, что это отказ от дороги
+                if (content.startsWith("TIME_SLOT_UNAVAILABLE")) {
+                    System.out.println("❌ " + agentId + ": Road rejected our proposal. Reason: " + content);
+
+                    // Сбрасываем состояние
+                    resetCompositionState();
+
+                }
+            }
         }
     }
 

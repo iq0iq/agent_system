@@ -32,7 +32,7 @@ public class WagonAgent extends Agent {
     private Map<String, CargoRequest> pendingRequests = new HashMap<>();
     private final long RETRY_INTERVAL = 4000;
     private final int MAX_RETRIES = 3;
-    private final long REQUEST_TIMEOUT = 15000;
+    private final long REQUEST_TIMEOUT = 60000;
 
     private class CargoRequest {
         String cargoId;
@@ -46,6 +46,7 @@ public class WagonAgent extends Agent {
         long lastAttemptTime;
         long creationTime;
         boolean isActive;
+        Proposal bestProposal;
 
         CargoRequest(String cargoId, String cargoType, double weight,
                      String fromStation, String toStation,
@@ -249,141 +250,160 @@ public class WagonAgent extends Agent {
                 return;
             }
 
-            if (currentCargoId == null || !pendingRequests.containsKey(currentCargoId)) {
-                return;
-            }
-
-            CargoRequest request = pendingRequests.get(currentCargoId);
-            if (request == null || !request.isActive) {
-                return;
-            }
-
-            // УДАЛЕНО: Таймаут ожидания ответов
-            // if ((System.currentTimeMillis() - startTime) > REQUEST_TIMEOUT) {
-            //     System.out.println(agentId + ": Timeout waiting for locomotive responses for cargo " + currentCargoId);
-            //
-            //     if (locomotiveProposals.size() > 0) {
-            //         processLocomotiveProposals(request);
-            //     } else {
-            //         if (request.canRetry()) {
-            //             System.out.println(agentId + ": Will retry request for cargo " + currentCargoId);
-            //             request.attemptCount++;
-            //             requestLocomotives(request);
-            //         } else {
-            //             System.out.println(agentId + ": Max retries reached or request expired for cargo " + currentCargoId);
-            //             sendRefusal(request.originalMessage, "NO_LOCOMOTIVE_RESPONSE", currentCargoId);
-            //             request.isActive = false;
-            //         }
-            //     }
-            //     return;
-            // }
-
-            if (locomotiveProposals.size() >= expectedLocomotiveResponses && expectedLocomotiveResponses > 0) {
-                System.out.println(agentId + ": Received all " + locomotiveProposals.size() + " locomotive responses");
-                processLocomotiveProposals(request);
-                return;
-            }
-
             ACLMessage msg = myAgent.receive(mt);
 
-            if (msg != null && currentCargoId != null) {
+            if (msg != null) {
                 String sender = msg.getSender().getLocalName();
+                String content = msg.getContent();
 
-                if (locomotiveProposals.containsKey(sender)) {
+                String cargoId = null;
+
+                if (msg.getPerformative() == ACLMessage.PROPOSE) {
+                    // Формат предложения: время:locomotiveId:cargoId
+                    String[] parts = content.split(":");
+                    if (parts.length >= 3) {
+                        cargoId = parts[2];
+                    }
+                } else if (msg.getPerformative() == ACLMessage.REFUSE) {
+                    // Формат отказа: cargoId:reason
+                    String[] parts = content.split(":");
+                    if (parts.length >= 1) {
+                        cargoId = parts[0];
+                    }
+                }
+
+                if (cargoId == null) {
+                    System.err.println(agentId + ": Cannot extract cargoId from message: " + content);
                     return;
                 }
 
-                if (msg.getPerformative() == ACLMessage.PROPOSE) {
-                    String content = msg.getContent();
-                    String[] parts = content.split(":");
-                    Date availableTime = new Date(Long.parseLong(parts[0]));
-                    String locomotiveId = parts[1];
-                    String cargoId = parts.length > 2 ? parts[2] : null;
+                // Проверяем, есть ли такой груз в pendingRequests
+                if (pendingRequests.containsKey(cargoId)) {
+                    CargoRequest request = pendingRequests.get(cargoId);
 
-                    if (currentCargoId.equals(cargoId)) {
+                    if (!request.isActive) {
+                        return; // Запрос уже не активен
+                    }
+
+                    if (locomotiveProposals.containsKey(sender + "_" + cargoId)) {
+                        return; // Уже обработали предложение от этого локомотива для этого груза
+                    }
+
+                    if (msg.getPerformative() == ACLMessage.PROPOSE) {
+                        String[] parts = content.split(":");
+                        Date availableTime = new Date(Long.parseLong(parts[0]));
+                        String locomotiveId = parts[1];
+
                         Proposal proposal = new Proposal(sender, locomotiveId, availableTime, true);
-                        locomotiveProposals.put(sender, proposal);
+                        locomotiveProposals.put(sender + "_" + cargoId, proposal);
+
                         System.out.println(agentId + ": Received proposal from locomotive " + sender +
                                 " for cargo " + cargoId + " at time: " + availableTime);
 
-                        if (locomotiveProposals.size() >= expectedLocomotiveResponses && expectedLocomotiveResponses > 0) {
-                            System.out.println(agentId + ": Received all " + locomotiveProposals.size() + " locomotive responses");
-                            processLocomotiveProposals(request);
-                        }
-                    }
-                } else if (msg.getPerformative() == ACLMessage.REFUSE) {
-                    String reason = msg.getContent();
+                        // Проверяем, получили ли все ответы для этого груза
+                        checkAllResponsesForCargo(cargoId, request);
 
-                    String cargoId = currentCargoId;
-                    if (reason.contains(":")) {
-                        String[] parts = reason.split(":");
-                        cargoId = parts[0];
-                    }
-
-                    if (currentCargoId.equals(cargoId)) {
+                    } else if (msg.getPerformative() == ACLMessage.REFUSE) {
+                        String reason = content.substring(cargoId.length() + 1); // Получаем причину после cargoId:
                         Proposal proposal = new Proposal(sender, reason);
-                        locomotiveProposals.put(sender, proposal);
+                        locomotiveProposals.put(sender + "_" + cargoId, proposal);
+
                         System.out.println(agentId + ": Received refusal from locomotive " + sender +
                                 " for cargo " + cargoId + ": " + reason);
 
-                        if (locomotiveProposals.size() >= expectedLocomotiveResponses && expectedLocomotiveResponses > 0) {
-                            System.out.println(agentId + ": Received all " + locomotiveProposals.size() + " locomotive responses");
-                            processLocomotiveProposals(request);
-                        }
+                        // Проверяем, получили ли все ответы для этого груза
+                        checkAllResponsesForCargo(cargoId, request);
                     }
+                } else {
+                    System.out.println(agentId + ": Received message for unknown cargo " + cargoId +
+                            ", current pending requests: " + pendingRequests.keySet());
                 }
             }
         }
 
-        private void processLocomotiveProposals(CargoRequest request) {
-            if (isProcessing) {
-                return;
+        private String extractCargoIdFromMessage(String content) {
+            try {
+                String[] parts = content.split(":");
+                if (parts.length >= 3) {
+                    // Формат предложения: время:locomotiveId:cargoId
+                    return parts[2];
+                } else if (parts.length == 2) {
+                    // Формат отказа: cargoId:reason
+                    return parts[0];
+                } else if (parts.length == 1) {
+                    // Просто сообщение без cargoId
+                    return null;
+                }
+            } catch (Exception e) {
+                System.err.println(agentId + ": Error extracting cargoId from: " + content);
+            }
+            return null;
+        }
+
+        private void checkAllResponsesForCargo(String cargoId, CargoRequest request) {
+            // Считаем, сколько предложений/отказов получили для этого груза
+            int responsesForCargo = 0;
+            for (String key : locomotiveProposals.keySet()) {
+                if (key.endsWith("_" + cargoId)) {
+                    responsesForCargo++;
+                }
             }
 
+            // Если получили все ответы для этого груза
+            if (responsesForCargo >= expectedLocomotiveResponses && expectedLocomotiveResponses > 0) {
+                System.out.println(agentId + ": Received all " + responsesForCargo +
+                        " responses for cargo " + cargoId);
+                processProposalsForCargo(cargoId, request);
+            }
+        }
+
+        private void processProposalsForCargo(String cargoId, CargoRequest request) {
             isProcessing = true;
             try {
-                System.out.println(agentId + ": Processing " + locomotiveProposals.size() + " proposals for cargo " + request.cargoId);
+                // Собираем все предложения для этого груза
+                List<Proposal> proposalsForCargo = new ArrayList<>();
+                for (Map.Entry<String, Proposal> entry : locomotiveProposals.entrySet()) {
+                    if (entry.getKey().endsWith("_" + cargoId)) {
+                        proposalsForCargo.add(entry.getValue());
+                    }
+                }
 
-                List<Proposal> allProposals = new ArrayList<>(locomotiveProposals.values());
-                bestLocomotiveProposal = TimeUtils.selectBestProposal(allProposals);
+                System.out.println(agentId + ": Processing " + proposalsForCargo.size() +
+                        " proposals for cargo " + cargoId);
 
-                if (bestLocomotiveProposal != null && bestLocomotiveProposal.isAvailable()) {
-                    System.out.println(agentId + ": Selected locomotive " + bestLocomotiveProposal.getResourceId() +
-                            " with time: " + bestLocomotiveProposal.getAvailableTime() +
-                            " for cargo " + request.cargoId);
+                Proposal bestProposal = TimeUtils.selectBestProposal(proposalsForCargo);
 
+                if (bestProposal != null && bestProposal.isAvailable()) {
+                    System.out.println(agentId + ": Selected locomotive " + bestProposal.getResourceId() +
+                            " with time: " + bestProposal.getAvailableTime() +
+                            " for cargo " + cargoId);
+
+                    // Сохраняем лучшее предложение для этого груза
+                    request.bestProposal = bestProposal;
+
+                    // Отправляем предложение грузу
                     ACLMessage reply = request.originalMessage.createReply();
                     reply.setPerformative(ACLMessage.PROPOSE);
-                    reply.setContent(bestLocomotiveProposal.getAvailableTime().getTime() + ":" + wagon.getId());
+                    reply.setContent(bestProposal.getAvailableTime().getTime() + ":" + wagon.getId());
                     myAgent.send(reply);
 
-                    System.out.println(agentId + ": Sent proposal to cargo " + request.cargoId +
-                            " for time: " + bestLocomotiveProposal.getAvailableTime());
+                    System.out.println(agentId + ": Sent proposal to cargo " + cargoId +
+                            " for time: " + bestProposal.getAvailableTime());
 
-                    currentCargoToStation = request.toStation;
-
-                    locomotiveProposals.clear();
-                    locomotiveAgentsContacted.clear();
-                    expectedLocomotiveResponses = 0;
                 } else {
-                    System.out.println(agentId + ": No suitable locomotive found for cargo " + request.cargoId);
+                    System.out.println(agentId + ": No suitable locomotive found for cargo " + cargoId);
 
                     if (request.canRetry()) {
-                        System.out.println(agentId + ": Will retry request for cargo " + request.cargoId);
+                        System.out.println(agentId + ": Will retry request for cargo " + cargoId);
                         request.attemptCount++;
-
-                        locomotiveProposals.clear();
-                        locomotiveAgentsContacted.clear();
-                        expectedLocomotiveResponses = 0;
-                        bestLocomotiveProposal = null;
-
                         requestLocomotives(request);
                     } else {
-                        System.out.println(agentId + ": Max retries reached for cargo " + request.cargoId);
-                        sendRefusal(request.originalMessage, "NO_SUITABLE_LOCOMOTIVE", request.cargoId);
+                        System.out.println(agentId + ": Max retries reached for cargo " + cargoId);
+                        sendRefusal(request.originalMessage, "NO_SUITABLE_LOCOMOTIVE", cargoId);
 
-                        pendingRequests.remove(request.cargoId);
-                        resetResponseState();
+                        pendingRequests.remove(cargoId);
+                        // Удаляем все предложения для этого груза
+                        locomotiveProposals.keySet().removeIf(key -> key.endsWith("_" + cargoId));
                     }
                 }
             } finally {
@@ -395,7 +415,10 @@ public class WagonAgent extends Agent {
     private class AcceptProposalBehaviour extends TickerBehaviour {
         private MessageTemplate mt = MessageTemplate.or(
                 MessageTemplate.MatchPerformative(ACLMessage.ACCEPT_PROPOSAL),
-                MessageTemplate.MatchPerformative(ACLMessage.INFORM)
+                MessageTemplate.or(
+                        MessageTemplate.MatchPerformative(ACLMessage.INFORM),
+                        MessageTemplate.MatchPerformative(ACLMessage.REJECT_PROPOSAL)
+                )
         );
 
         public AcceptProposalBehaviour(Agent a, long period) {
@@ -414,17 +437,22 @@ public class WagonAgent extends Agent {
                     String cargoId = parts[0];
                     String toStation = parts[1];
 
-                    if (bestLocomotiveProposal != null && pendingRequests.containsKey(cargoId)) {
-                        ACLMessage acceptMsg = new ACLMessage(ACLMessage.ACCEPT_PROPOSAL);
-                        acceptMsg.addReceiver(new jade.core.AID(bestLocomotiveProposal.getAgentId(), jade.core.AID.ISLOCALNAME));
-                        acceptMsg.setContent("ACCEPT_PROPOSAL:" + cargoId + ":" + toStation);
-                        myAgent.send(acceptMsg);
+                    // Ищем запрос для этого груза
+                    if (pendingRequests.containsKey(cargoId)) {
+                        CargoRequest request = pendingRequests.get(cargoId);
 
-                        System.out.println("⏫ " + agentId + ": Sent ACCEPT_PROPOSAL to locomotive " +
-                                bestLocomotiveProposal.getAgentId() + " for cargo " + cargoId);
+                        if (request.bestProposal != null) {
+                            ACLMessage acceptMsg = new ACLMessage(ACLMessage.ACCEPT_PROPOSAL);
+                            acceptMsg.addReceiver(new jade.core.AID(
+                                    request.bestProposal.getAgentId(),
+                                    jade.core.AID.ISLOCALNAME));
+                            acceptMsg.setContent("ACCEPT_PROPOSAL:" + cargoId + ":" + toStation);
+                            myAgent.send(acceptMsg);
 
-                        if (pendingRequests.containsKey(cargoId)) {
-                            pendingRequests.get(cargoId).isActive = false;
+                            System.out.println("⏫ " + agentId + ": Sent ACCEPT_PROPOSAL to locomotive " +
+                                    request.bestProposal.getAgentId() + " for cargo " + cargoId);
+
+                            request.isActive = false;
                         }
                     }
                 } else if (content.startsWith("SCHEDULE_FINALIZED:")) {
@@ -465,7 +493,31 @@ public class WagonAgent extends Agent {
                     } else {
                         System.err.println(agentId + ": Invalid SCHEDULE_FINALIZED format: " + content);
                     }
+                } else if (content.startsWith("ROAD_REJECTED:")) {
+                // Обработка отказа от дороги
+                String[] parts = content.substring("ROAD_REJECTED:".length()).split(":");
+                String reason = parts[0];
+                String cargoId = parts.length > 1 ? parts[1] : "";
+                String locomotiveId = parts.length > 2 ? parts[2] : "";
+
+                System.out.println("❌ " + agentId + ": Road rejected schedule. Reason: " +
+                        reason + ", cargo: " + cargoId + ", locomotive: " + locomotiveId);
+
+                // Сбрасываем состояние для этого груза
+                if (!cargoId.isEmpty() && pendingRequests.containsKey(cargoId)) {
+                    pendingRequests.get(cargoId).isActive = false;
+                    pendingRequests.remove(cargoId);
                 }
+
+                // Если это текущий груз, сбрасываем состояние
+                if (currentCargoId != null && currentCargoId.equals(cargoId)) {
+                    resetResponseState();
+                }
+
+                // Освобождаем вагон
+                wagon.setAvailable(true);
+                System.out.println(agentId + ": Wagon available again after road rejection");
+            }
             }
         }
     }
