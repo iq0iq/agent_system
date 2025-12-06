@@ -32,7 +32,7 @@ public class WagonAgent extends Agent {
     private Map<String, CargoRequest> pendingRequests = new HashMap<>();
     private final long RETRY_INTERVAL = 4000;
     private final int MAX_RETRIES = 3;
-    private final long REQUEST_TIMEOUT = 60000;
+    private final long REQUEST_TIMEOUT = 600000;
 
     private class CargoRequest {
         String cargoId;
@@ -472,6 +472,14 @@ public class WagonAgent extends Agent {
                         System.out.println("✅ " + agentId + ": Schedule FINALIZED: " + scheduleId +
                                 ", departure: " + departureTime + ", arrival: " + arrivalTime);
 
+                        for (CargoRequest request : pendingRequests.values()) {
+                            if (request.isActive) {
+                                sendRefusal(request.originalMessage, "WAGON_MOVED_TO_NEW_STATION", request.cargoId);
+                            }
+                        }
+                        pendingRequests.clear();
+                        processedCargoRequests.clear();
+
                         if (currentCargoId != null && pendingRequests.containsKey(currentCargoId)) {
                             CargoRequest request = pendingRequests.get(currentCargoId);
                             if (request != null) {
@@ -534,13 +542,13 @@ public class WagonAgent extends Agent {
             for (Map.Entry<String, CargoRequest> entry : pendingRequests.entrySet()) {
                 CargoRequest request = entry.getValue();
 
-                if (request.isExpired()) {
-                    System.out.println(agentId + ": Request for cargo " + request.cargoId + " expired");
-                    sendRefusal(request.originalMessage, "REQUEST_TIMEOUT", request.cargoId);
-                    toRemove.add(request.cargoId);
-                    processedCargoRequests.remove(request.cargoId + "_" + agentId);
-                    continue;
-                }
+//                if (request.isExpired()) {
+//                    System.out.println(agentId + ": Request for cargo " + request.cargoId + " expired");
+//                    sendRefusal(request.originalMessage, "REQUEST_TIMEOUT", request.cargoId);
+//                    toRemove.add(request.cargoId);
+//                    processedCargoRequests.remove(request.cargoId + "_" + agentId);
+//                    continue;
+//                }
 
                 if (request.isActive && request.canRetry()) {
                     if (!wagon.getCurrentStation().equals(request.fromStation)) {

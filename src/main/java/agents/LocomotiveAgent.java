@@ -366,16 +366,16 @@ public class LocomotiveAgent extends Agent {
                 sendRefusal(request.originalMessage, request.cargoId, "CANNOT_ADD_TO_COMPOSITION");
             }
         }
-
+        pendingWagonRequests.clear();
         // Удаляем обработанные запросы
-        for (WagonRequest request : sortedRequests) {
-            String key = request.wagonId + "_" + request.cargoId;
-            if (currentComposition != null &&
-                    (currentComposition.containsWagon(request.wagonId) ||
-                            currentComposition.containsCargo(request.cargoId))) {
-                pendingWagonRequests.remove(key);
-            }
-        }
+//        for (WagonRequest request : sortedRequests) {
+//            String key = request.wagonId + "_" + request.cargoId;
+//            if (currentComposition != null &&
+//                    (currentComposition.containsWagon(request.wagonId) ||
+//                            currentComposition.containsCargo(request.cargoId))) {
+//                pendingWagonRequests.remove(key);
+//            }
+//        }
 
         if (currentComposition != null && currentComposition.wagons.size() > 0) {
             System.out.println(agentId + ": Formed composition " + currentComposition.compositionId +
@@ -633,14 +633,14 @@ public class LocomotiveAgent extends Agent {
                 shouldSend = true;
             }
 
-            if (shouldSend && bestRoadProposal != null) {
+            if (shouldSend) {
                 sendRoadAcceptance();
                 waitingForWagonAcceptances = false;
             }
         }
 
         private void sendRoadAcceptance() {
-            if (bestRoadProposal == null || currentComposition == null || acceptedWagons.isEmpty()) {
+            if (currentComposition == null || acceptedWagons.isEmpty()) {
                 System.out.println(agentId + ": Cannot send road acceptance - missing required data");
                 return;
             }
@@ -703,6 +703,11 @@ public class LocomotiveAgent extends Agent {
                     String cargoIds = parts[4];
 
                     scheduleData.reserveTimeSlot(departureTime, arrivalTime);
+                    for (WagonRequest request : pendingWagonRequests.values()) {
+                        sendRefusal(request.originalMessage, request.cargoId, "LOCOMOTIVE_MOVED_TO_NEW_STATION");
+                    }
+                    pendingWagonRequests.clear();
+                    processedWagonRequests.clear();
 
                     System.out.println("✅ " + agentId + ": Schedule FINALIZED: " + scheduleId +
                             ", departure: " + departureTime + ", arrival: " + arrivalTime);
@@ -761,11 +766,11 @@ public class LocomotiveAgent extends Agent {
 //            }
 
             // Очистка зависших ожиданий подтверждения от вагонов
-            if (waitingForWagonAcceptances &&
-                    (currentTime - wagonAcceptStartTime) > (WAGON_ACCEPT_TIMEOUT + 10000)) {
-                System.out.println(agentId + ": Stuck waiting for wagon acceptances, resetting state");
-                resetCompositionState();
-            }
+//            if (waitingForWagonAcceptances &&
+//                    (currentTime - wagonAcceptStartTime) > (WAGON_ACCEPT_TIMEOUT + 10000)) {
+//                System.out.println(agentId + ": Stuck waiting for wagon acceptances, resetting state");
+//                resetCompositionState();
+//            }
         }
 
         private void sendRefusal(ACLMessage originalMsg, String cargoId, String reason) {

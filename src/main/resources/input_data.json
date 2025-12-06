@@ -88,8 +88,18 @@
           "id": "C9",
           "type": "container",
           "weight": 20.0,
-          "fromStation": "ST3",
-          "toStation": "ST1"
+          "fromStation": "ST4",
+          "toStation": "ST5"
+        }
+      },
+      {
+        "agentId": "CargoAgent10",
+        "cargo": {
+          "id": "C10",
+          "type": "bulk",
+          "weight": 15.0,
+          "fromStation": "ST4",
+          "toStation": "ST5"
         }
       }
     ],
@@ -150,7 +160,7 @@
           "id": "W6",
           "type": "flatcar",
           "capacity": 30.0,
-          "currentStation": "ST3",
+          "currentStation": "ST4",
           "compatibleCargoTypes": ["container", "refrigerated"]
         }
       }
@@ -221,17 +231,9 @@
       {
         "agentId": "RoadAgent6",
         "route": {
-          "fromStation": "ST1",
+          "fromStation": "ST4",
           "toStation": "ST5",
           "distance": 900.0
-        }
-      },
-      {
-        "agentId": "RoadAgent7",
-        "route": {
-          "fromStation": "ST3",
-          "toStation": "ST5",
-          "distance": 700.0
         }
       }
     ]
@@ -259,8 +261,8 @@
     },
     {
       "id": "ST5",
-      "name": "Yekaterinburg",
-      "location": "YEK"
+      "name": "Kazan",
+      "location": "KZ"
     }
   ]
 }
