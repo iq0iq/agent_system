@@ -640,7 +640,7 @@ public class LocomotiveAgent extends Agent {
         }
 
         private void sendRoadAcceptance() {
-            if (currentComposition == null || acceptedWagons.isEmpty()) {
+            if (bestRoadProposal == null || currentComposition == null || acceptedWagons.isEmpty()) {
                 System.out.println(agentId + ": Cannot send road acceptance - missing required data");
                 return;
             }

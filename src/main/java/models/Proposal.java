@@ -8,6 +8,16 @@ public class Proposal {
     private Date availableTime;
     private boolean available;
     private String reason;
+    private String additionalData; // Новое поле
+
+    // Конструкторы и методы
+    public void setAdditionalData(String data) {
+        this.additionalData = data;
+    }
+
+    public String getAdditionalData() {
+        return additionalData;
+    }
 
     public Proposal(String agentId, String resourceId, Date availableTime, boolean available) {
         this.agentId = agentId;

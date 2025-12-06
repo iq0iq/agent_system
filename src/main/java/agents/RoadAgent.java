@@ -10,7 +10,6 @@ import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import models.Route;
 import models.ScheduleData;
-import models.TimeSlot;
 import utils.DataLoader;
 import utils.TimeUtils;
 import java.util.*;
@@ -88,10 +87,8 @@ public class RoadAgent extends Agent {
         private void handleLocomotiveRequest(ACLMessage msg, String content) {
             try {
                 String[] parts = content.substring("LOCOMOTIVE_REQUEST:".length()).split(":");
-
                 if (parts.length < 7) {
                     System.err.println(agentId + ": Invalid LOCOMOTIVE_REQUEST format. Expected 7 parts, got " + parts.length);
-                    System.err.println("Content: " + content);
                     sendRefusal(msg, "INVALID_REQUEST_FORMAT");
                     return;
                 }

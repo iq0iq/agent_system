@@ -502,30 +502,30 @@ public class WagonAgent extends Agent {
                         System.err.println(agentId + ": Invalid SCHEDULE_FINALIZED format: " + content);
                     }
                 } else if (content.startsWith("ROAD_REJECTED:")) {
-                // Обработка отказа от дороги
-                String[] parts = content.substring("ROAD_REJECTED:".length()).split(":");
-                String reason = parts[0];
-                String cargoId = parts.length > 1 ? parts[1] : "";
-                String locomotiveId = parts.length > 2 ? parts[2] : "";
+                    // Обработка отказа от дороги
+                    String[] parts = content.substring("ROAD_REJECTED:".length()).split(":");
+                    String reason = parts[0];
+                    String cargoId = parts.length > 1 ? parts[1] : "";
+                    String locomotiveId = parts.length > 2 ? parts[2] : "";
 
-                System.out.println("❌ " + agentId + ": Road rejected schedule. Reason: " +
-                        reason + ", cargo: " + cargoId + ", locomotive: " + locomotiveId);
+                    System.out.println("❌ " + agentId + ": Road rejected schedule. Reason: " +
+                            reason + ", cargo: " + cargoId + ", locomotive: " + locomotiveId);
 
-                // Сбрасываем состояние для этого груза
-                if (!cargoId.isEmpty() && pendingRequests.containsKey(cargoId)) {
-                    pendingRequests.get(cargoId).isActive = false;
-                    pendingRequests.remove(cargoId);
+                    // Сбрасываем состояние для этого груза
+                    if (!cargoId.isEmpty() && pendingRequests.containsKey(cargoId)) {
+                        pendingRequests.get(cargoId).isActive = false;
+                        pendingRequests.remove(cargoId);
+                    }
+
+                    // Если это текущий груз, сбрасываем состояние
+                    if (currentCargoId != null && currentCargoId.equals(cargoId)) {
+                        resetResponseState();
+                    }
+
+                    // Освобождаем вагон
+                    wagon.setAvailable(true);
+                    System.out.println(agentId + ": Wagon available again after road rejection");
                 }
-
-                // Если это текущий груз, сбрасываем состояние
-                if (currentCargoId != null && currentCargoId.equals(cargoId)) {
-                    resetResponseState();
-                }
-
-                // Освобождаем вагон
-                wagon.setAvailable(true);
-                System.out.println(agentId + ": Wagon available again after road rejection");
-            }
             }
         }
     }
