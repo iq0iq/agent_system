@@ -525,6 +525,14 @@ public class WagonAgent extends Agent {
                     // Освобождаем вагон
                     wagon.setAvailable(true);
                     System.out.println(agentId + ": Wagon available again after road rejection");
+                } else if (content.startsWith("LOCOMOTIVE_REJECTED:")) {
+                    String[] parts = content.substring("LOCOMOTIVE_REJECTED:".length()).split(":");
+                    String reason = parts[0];
+                    String locomotiveId = parts.length > 1 ? parts[1] : "";
+
+                    System.out.println("❌ " + agentId + ": Locomotive rejected schedule. Reason: " +
+                            reason + ", locomotive: " + locomotiveId);
+                    wagon.setAvailable(true);
                 }
             }
         }

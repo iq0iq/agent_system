@@ -618,7 +618,10 @@ public class LocomotiveAgent extends Agent {
         }
 
         private void checkAndSendRoadAcceptance() {
-            if (!waitingForWagonAcceptances || currentComposition == null) return;
+            if (currentComposition == null) {
+                return;
+            }
+            if (!waitingForWagonAcceptances) return;
 
             long currentTime = System.currentTimeMillis();
             boolean shouldSend = false;
@@ -642,6 +645,41 @@ public class LocomotiveAgent extends Agent {
         private void sendRoadAcceptance() {
             if (bestRoadProposal == null || currentComposition == null || acceptedWagons.isEmpty()) {
                 System.out.println(agentId + ": Cannot send road acceptance - missing required data");
+                Set<String> allCargoIds = new HashSet<>();
+                Set<String> allWagonIds = new HashSet<>();
+//                if (currentComposition != null) {
+//                    for (WagonRequest wagon : currentComposition.wagons) {
+//                        allCargoIds.add(wagon.cargoId);
+//                        allWagonIds.add(wagon.wagonId);
+//                    }
+//                }
+                for (WagonAcceptance acceptance : acceptedWagons.values()) {
+                    allCargoIds.add(acceptance.cargoId);
+                    allWagonIds.add(acceptance.wagonId);
+                }
+                for (String cargoId : allCargoIds) {
+                    try {
+                        String cargoAgentName = "CargoAgent" + cargoId.substring(1);
+                        ACLMessage cargoRejectMsg = new ACLMessage(ACLMessage.REJECT_PROPOSAL);
+                        cargoRejectMsg.addReceiver(new jade.core.AID(cargoAgentName, jade.core.AID.ISLOCALNAME));
+                        cargoRejectMsg.setContent("LOCOMOTIVE_REJECTED:" + "unknown" + ":" + agentId);
+                        send(cargoRejectMsg);
+                    } catch (Exception e) {
+                        System.err.println("   Error sending rejection to cargo " + cargoId + ": " + e.getMessage());
+                    }
+                }
+                for (String wagonId : allWagonIds) {
+                    try {
+                        String wagonAgentName = "WagonAgent" + wagonId.substring(1);
+                        ACLMessage wagonRejectMsg = new ACLMessage(ACLMessage.REJECT_PROPOSAL);
+                        wagonRejectMsg.addReceiver(new jade.core.AID(wagonAgentName, jade.core.AID.ISLOCALNAME));
+                        wagonRejectMsg.setContent("LOCOMOTIVE_REJECTED:" + "unknown" + ":" + agentId);
+                        send(wagonRejectMsg);
+                    } catch (Exception e) {
+                        System.err.println("   Error sending rejection to wagon " + wagonId + ": " + e.getMessage());
+                    }
+                }
+                resetCompositionState();
                 return;
             }
 
