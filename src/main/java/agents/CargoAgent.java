@@ -82,14 +82,13 @@ public class CargoAgent extends Agent {
                                     cargo.getToStation() + ":" +
                                     DataLoader.getSimulationStartTime().getTime());
                             send(msg);
-                            System.out.println(agentId + ": Sent cargo request to wagon: " + desc.getName().getLocalName());
                         }
                         expectedWagonResponses = wagonAgents.length;
                         startTime = System.currentTimeMillis();
                         requestSent = true;
                         System.out.println(agentId + ": Sent requests to " + wagonAgents.length + " wagon agents");
                     } else {
-                        System.out.println(agentId + ": No wagon agents found! Next check in " + (getPeriod()/1000) + " seconds");
+                        System.out.println(agentId + ": No wagon agents found!");
                     }
                 } catch (FIPAException e) {
                     e.printStackTrace();
@@ -112,23 +111,18 @@ public class CargoAgent extends Agent {
             if (!isProcessing) {
                 return;
             }
-
             if (wagonProposals.size() >= expectedWagonResponses) {
                 processProposals();
                 return;
             }
-
             ACLMessage msg = receive(mt);
-
             if (msg != null) {
                 String sender = msg.getSender().getLocalName();
-
                 if (msg.getPerformative() == ACLMessage.PROPOSE) {
                     String content = msg.getContent();
                     String[] parts = content.split(":");
                     Date availableTime = new Date(Long.parseLong(parts[0]));
                     String wagonId = parts[1];
-
                     Proposal proposal = new Proposal(sender, wagonId, availableTime, true);
                     wagonProposals.put(sender, proposal);
                     System.out.println(agentId + ": Received proposal from " + sender +
@@ -136,7 +130,6 @@ public class CargoAgent extends Agent {
                 } else if (msg.getPerformative() == ACLMessage.REFUSE) {
                     Proposal proposal = new Proposal(sender, msg.getContent());
                     wagonProposals.put(sender, proposal);
-                    System.out.println(agentId + ": Received refusal from " + sender);
                 }
             }
         }
@@ -150,7 +143,6 @@ public class CargoAgent extends Agent {
             if (bestWagonProposal != null) {
                 System.out.println(agentId + ": Selected wagon " + bestWagonProposal.getResourceId() +
                         " with time: " + bestWagonProposal.getAvailableTime());
-
                 ACLMessage acceptMsg = new ACLMessage(ACLMessage.ACCEPT_PROPOSAL);
                 acceptMsg.addReceiver(new jade.core.AID(bestWagonProposal.getAgentId(), jade.core.AID.ISLOCALNAME));
                 acceptMsg.setContent("ACCEPT_PROPOSAL:" + cargo.getId() + ":" + cargo.getToStation());
@@ -190,49 +182,34 @@ public class CargoAgent extends Agent {
                 String content = msg.getContent();
                 System.out.println(agentId + ": Received schedule message: " + content);
 
-                if (content.startsWith("SCHEDULE_CONFIRMED:")) {
-                    String[] parts = content.substring("SCHEDULE_CONFIRMED:".length()).split(":");
-                    String scheduleId = parts[0];
-                    Date departureTime = new Date(Long.parseLong(parts[1]));
-                    Date arrivalTime = new Date(Long.parseLong(parts[2]));
-
-                    System.out.println("✅ " + agentId + ": Schedule confirmed: " + scheduleId +
-                            ", departure: " + departureTime +
-                            ", arrival: " + arrivalTime);
-                } else if (content.startsWith("SCHEDULE_FINALIZED:")) {
+                if (content.startsWith("SCHEDULE_FINALIZED:")) {
                     String[] parts = content.substring("SCHEDULE_FINALIZED:".length()).split(":");
                     if (parts.length >= 3) {
                         String scheduleId = parts[0];
                         Date departureTime = new Date(Long.parseLong(parts[1]));
                         Date arrivalTime = new Date(Long.parseLong(parts[2]));
-
-                        System.out.println("✅ " + agentId + ": Schedule FINALIZED: " + scheduleId +
+                        System.out.println(agentId + ": Schedule FINALIZED: " + scheduleId +
                                 ", departure: " + departureTime +
                                 ", arrival: " + arrivalTime);
                     } else {
                         System.err.println(agentId + ": Invalid SCHEDULE_FINALIZED format: " + content);
                     }
                 } else if (content.startsWith("ROAD_REJECTED:")) {
-                    // Обработка отказа от дороги
                     String[] parts = content.substring("ROAD_REJECTED:".length()).split(":");
                     String reason = parts[0];
                     String locomotiveId = parts.length > 1 ? parts[1] : "";
-
-                    System.out.println("❌ " + agentId + ": Road rejected schedule. Reason: " +
+                    System.out.println(agentId + ": Road rejected schedule. Reason: " +
                             reason + ", locomotive: " + locomotiveId);
 
-                    // Сбрасываем состояние, чтобы начать новый поиск
                     requestSent = false;
                     isProcessing = false;
                     bestWagonProposal = null;
-
                     System.out.println(agentId + ": Will retry scheduling cargo");
                 } else if (content.startsWith("LOCOMOTIVE_REJECTED:")) {
                 String[] parts = content.substring("LOCOMOTIVE_REJECTED:".length()).split(":");
                 String reason = parts[0];
                 String locomotiveId = parts.length > 1 ? parts[1] : "";
-
-                System.out.println("❌ " + agentId + ": Locomotive rejected schedule. Reason: " +
+                System.out.println(agentId + ": Locomotive rejected schedule. Reason: " +
                         reason + ", locomotive: " + locomotiveId);
                 requestSent = false;
                 isProcessing = false;

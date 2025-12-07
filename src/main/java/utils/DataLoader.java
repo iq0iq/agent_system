@@ -24,7 +24,6 @@ public class DataLoader {
             data = JsonParser.parseReader(reader).getAsJsonObject();
             reader.close();
 
-            // Загружаем время начала симуляции
             String timeStr = data.get("simulationStartTime").getAsString();
             simulationStartTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(timeStr);
         } catch (Exception e) {
@@ -64,12 +63,6 @@ public class DataLoader {
             JsonObject agentObj = agent.getAsJsonObject();
             if (agentObj.get("agentId").getAsString().equals(agentId)) {
                 Locomotive locomotive = gson.fromJson(agentObj.get("locomotive"), Locomotive.class);
-
-                // Устанавливаем скорость по умолчанию, если она не указана
-                if (locomotive.getSpeed() == 0) {
-                    locomotive.setSpeed(60.0); // значение по умолчанию 60 км/ч
-                }
-
                 return locomotive;
             }
         }
@@ -85,15 +78,6 @@ public class DataLoader {
             }
         }
         return null;
-    }
-
-    public static List<Route> getAllRoutes() {
-        List<Route> routes = new ArrayList<>();
-        var routesArray = data.getAsJsonArray("routes");
-        for (var route : routesArray) {
-            routes.add(gson.fromJson(route, Route.class));
-        }
-        return routes;
     }
 
     public static List<String> getAllCargoAgentIds() {
@@ -119,16 +103,5 @@ public class DataLoader {
             ids.add(agent.getAsJsonObject().get("agentId").getAsString());
         }
         return ids;
-    }
-
-    public static Station getStationById(String stationId) {
-        var stationsArray = data.getAsJsonArray("stations");
-        for (var station : stationsArray) {
-            JsonObject stationObj = station.getAsJsonObject();
-            if (stationObj.get("id").getAsString().equals(stationId)) {
-                return gson.fromJson(stationObj, Station.class);
-            }
-        }
-        return null;
     }
 }

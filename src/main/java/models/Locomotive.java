@@ -3,7 +3,7 @@ package models;
 public class Locomotive {
     private String id, type, currentStation;
     private double maxWeightCapacity;
-    private double speed; // км/ч
+    private double speed;
     private boolean available = true;
 
     public String getId() { return id; }

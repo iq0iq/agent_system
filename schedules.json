@@ -1,77 +1,57 @@
 [
   {
+    "toStation": "ST2",
     "departureTime": "Jan 1, 2025, 8:00:00 AM",
     "locomotiveId": "L1",
     "cargoIds": "C1,C3,C8",
     "roadAgent": "RoadAgent1",
     "wagonIds": "W1,W3,W5",
-    "fromStation": "ST1",
-    "toStation": "ST2",
-    "locomotiveSpeed": 80.0,
-    "duration": 488.0,
     "arrivalTime": "Jan 1, 2025, 4:08:00 PM",
-    "totalWeight": 140.0,
-    "trainAvailableTime": "Jan 1, 2025, 8:00:00 AM",
-    "scheduleId": "SCHEDULE_1765051898439_L1_-1114722756"
+    "scheduleId": "SCHEDULE_1765096899015_L1_-1114722756",
+    "fromStation": "ST1"
   },
   {
+    "toStation": "ST3",
     "departureTime": "Jan 1, 2025, 8:00:00 AM",
     "locomotiveId": "L2",
     "cargoIds": "C2,C5",
     "roadAgent": "RoadAgent2",
     "wagonIds": "W2,W4",
-    "fromStation": "ST2",
-    "toStation": "ST3",
-    "locomotiveSpeed": 60.0,
-    "duration": 400.0,
     "arrivalTime": "Jan 1, 2025, 2:40:00 PM",
-    "totalWeight": 60.0,
-    "trainAvailableTime": "Jan 1, 2025, 8:00:00 AM",
-    "scheduleId": "SCHEDULE_1765051898717_L2_81880910"
+    "scheduleId": "SCHEDULE_1765096899523_L2_81880910",
+    "fromStation": "ST2"
   },
   {
+    "toStation": "ST4",
     "departureTime": "Jan 1, 2025, 4:08:00 PM",
     "locomotiveId": "L1",
     "cargoIds": "C7,C6",
     "roadAgent": "RoadAgent5",
     "wagonIds": "W1,W3",
-    "fromStation": "ST2",
-    "toStation": "ST4",
-    "locomotiveSpeed": 80.0,
-    "duration": 75.0,
     "arrivalTime": "Jan 1, 2025, 5:23:00 PM",
-    "totalWeight": 40.0,
-    "trainAvailableTime": "Jan 1, 2025, 4:08:00 PM",
-    "scheduleId": "SCHEDULE_1765051918358_L1_81851118"
+    "scheduleId": "SCHEDULE_1765096919051_L1_81851118",
+    "fromStation": "ST2"
   },
   {
-    "departureTime": "Jan 1, 2025, 5:23:00 PM",
-    "locomotiveId": "L1",
-    "cargoIds": "C10,C9",
-    "roadAgent": "RoadAgent6",
-    "wagonIds": "W1,W6",
-    "fromStation": "ST4",
-    "toStation": "ST5",
-    "locomotiveSpeed": 80.0,
-    "duration": 675.0,
-    "arrivalTime": "Jan 2, 2025, 4:38:00 AM",
-    "totalWeight": 35.0,
-    "trainAvailableTime": "Jan 1, 2025, 5:23:00 PM",
-    "scheduleId": "SCHEDULE_1765051938335_L1_81851121"
-  },
-  {
+    "toStation": "ST2",
     "departureTime": "Jan 1, 2025, 2:40:00 PM",
     "locomotiveId": "L2",
     "cargoIds": "C4",
     "roadAgent": "RoadAgent4",
     "wagonIds": "W4",
-    "fromStation": "ST3",
-    "toStation": "ST2",
-    "locomotiveSpeed": 60.0,
-    "duration": 420,
     "arrivalTime": "Jan 1, 2025, 9:40:00 PM",
-    "totalWeight": 40.0,
-    "trainAvailableTime": "Jan 1, 2025, 2:40:00 PM",
-    "scheduleId": "SCHEDULE_1765052038173_L2_2749"
+    "scheduleId": "SCHEDULE_1765096919231_L2_2749",
+    "fromStation": "ST3"
+  },
+  {
+    "toStation": "ST5",
+    "departureTime": "Jan 1, 2025, 5:23:00 PM",
+    "locomotiveId": "L1",
+    "cargoIds": "C10,C9",
+    "roadAgent": "RoadAgent6",
+    "wagonIds": "W1,W6",
+    "arrivalTime": "Jan 2, 2025, 4:38:00 AM",
+    "scheduleId": "SCHEDULE_1765096939220_L1_81851121",
+    "fromStation": "ST4"
   }
 ]

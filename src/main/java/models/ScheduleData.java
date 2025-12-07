@@ -13,12 +13,7 @@ public class ScheduleData {
         this.schedule = new ArrayList<>();
     }
 
-    public String getResourceId() { return resourceId; }
     public List<TimeSlot> getSchedule() { return schedule; }
-
-    public void setSchedule(List<TimeSlot> schedule) {
-        this.schedule = schedule;
-    }
 
     public Date findNearestAvailableTimeAfter(Date afterTime, int durationMinutes) {
         if (afterTime == null) {
@@ -28,11 +23,8 @@ public class ScheduleData {
         if (schedule.isEmpty()) {
             return afterTime;
         }
-
-        // Сортируем слоты по времени начала
         schedule.sort((s1, s2) -> s1.getStartTime().compareTo(s2.getStartTime()));
 
-        // Проверяем первое окно (до первого слота)
         TimeSlot firstSlot = schedule.get(0);
         Date windowStart = afterTime;
         Date windowEnd = firstSlot.getStartTime();
@@ -43,8 +35,6 @@ public class ScheduleData {
                 return windowStart;
             }
         }
-
-        // Проверяем окна между слотами
         for (int i = 1; i < schedule.size(); i++) {
             TimeSlot prevSlot = schedule.get(i - 1);
             TimeSlot currSlot = schedule.get(i);
@@ -52,7 +42,6 @@ public class ScheduleData {
             windowStart = prevSlot.getEndTime();
             windowEnd = currSlot.getStartTime();
 
-            // Если afterTime позже, чем начало окна, используем afterTime
             if (windowStart.before(afterTime)) {
                 windowStart = afterTime;
             }
@@ -65,66 +54,14 @@ public class ScheduleData {
             }
         }
 
-        // Проверяем окно после последнего слота
         TimeSlot lastSlot = schedule.get(schedule.size() - 1);
         windowStart = lastSlot.getEndTime();
 
-        // Если afterTime позже, используем afterTime
         if (windowStart.before(afterTime)) {
             windowStart = afterTime;
         }
 
         return windowStart;
-    }
-
-    /**
-     * Находит оптимальное время для добавления составов,
-     * учитывая возможность группировки
-     */
-    public Date findOptimizedTimeForComposition(Date preferredTime, int durationMinutes,
-                                                int maxDelayMinutes) {
-        if (schedule.isEmpty()) {
-            return preferredTime;
-        }
-
-        // Сортируем слоты
-        schedule.sort((s1, s2) -> s1.getStartTime().compareTo(s2.getStartTime()));
-
-        // Ищем слот, к которому можно добавиться
-        for (int i = 0; i < schedule.size(); i++) {
-            TimeSlot slot = schedule.get(i);
-
-            // Если слот доступен (можно расширить)
-            if (!slot.isAvailable() && slot.getEndTime().after(preferredTime)) {
-                // Проверяем возможность добавиться сразу после этого слота
-                Date potentialStart = slot.getEndTime();
-                long delay = (potentialStart.getTime() - preferredTime.getTime()) / 60000;
-
-                // Если задержка приемлема
-                if (delay <= maxDelayMinutes) {
-                    // Проверяем, есть ли место после слота
-                    Date potentialEnd = new Date(potentialStart.getTime() + durationMinutes * 60000L);
-
-                    // Проверяем конфликты
-                    boolean conflicts = false;
-                    for (TimeSlot otherSlot : schedule) {
-                        if (otherSlot != slot &&
-                                potentialStart.before(otherSlot.getEndTime()) &&
-                                potentialEnd.after(otherSlot.getStartTime())) {
-                            conflicts = true;
-                            break;
-                        }
-                    }
-
-                    if (!conflicts) {
-                        return potentialStart;
-                    }
-                }
-            }
-        }
-
-        // Если не нашли возможности группировки, используем стандартный метод
-        return findNearestAvailableTimeAfter(preferredTime, durationMinutes);
     }
 
     public boolean reserveTimeSlot(Date startTime, Date endTime) {
@@ -140,18 +77,11 @@ public class ScheduleData {
                 break;
             }
         }
-
         schedule.add(insertIndex, newSlot);
-
-        // Сортируем после добавления
         schedule.sort((s1, s2) -> s1.getStartTime().compareTo(s2.getStartTime()));
-
         return true;
     }
 
-    /**
-     * Проверяет возможность добавления слота без конфликтов
-     */
     public boolean canAddTimeSlot(Date startTime, Date endTime) {
         for (TimeSlot slot : schedule) {
             if (startTime.before(slot.getEndTime()) && endTime.after(slot.getStartTime())) {
@@ -161,9 +91,6 @@ public class ScheduleData {
         return true;
     }
 
-    /**
-     * Возвращает список свободных окон заданной длительности
-     */
     public List<TimeSlot> findAvailableWindows(int durationMinutes, Date afterTime) {
         List<TimeSlot> windows = new ArrayList<>();
 
@@ -175,10 +102,8 @@ public class ScheduleData {
             return windows;
         }
 
-        // Сортируем
         schedule.sort((s1, s2) -> s1.getStartTime().compareTo(s2.getStartTime()));
 
-        // Первое окно
         Date windowStart = afterTime;
         Date windowEnd = schedule.get(0).getStartTime();
 
@@ -191,8 +116,6 @@ public class ScheduleData {
                 windows.add(window);
             }
         }
-
-        // Окна между слотами
         for (int i = 1; i < schedule.size(); i++) {
             TimeSlot prev = schedule.get(i - 1);
             TimeSlot curr = schedule.get(i);
@@ -211,7 +134,6 @@ public class ScheduleData {
             }
         }
 
-        // Окно после последнего слота
         TimeSlot last = schedule.get(schedule.size() - 1);
         windowStart = last.getEndTime();
         windowEnd = new Date(windowStart.getTime() + durationMinutes * 60000L * 10); // Большое окно
