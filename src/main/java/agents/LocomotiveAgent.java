@@ -30,8 +30,8 @@ public class LocomotiveAgent extends Agent {
     private Map<String, WagonRequest> pendingWagonRequests = new HashMap<>();
     private TrainComposition currentComposition = null;
     private boolean isProcessingComposition = false;
-    private final long COMPOSITION_TIMEOUT = 15000;
-    private final long WAGON_ACCEPT_TIMEOUT = 10000;
+    private final long COMPOSITION_TIMEOUT = 7500;
+    private final long WAGON_ACCEPT_TIMEOUT = 5000;
 
     private boolean isCollectingWagons = false;
     private long compositionStartTime = 0;
@@ -44,162 +44,6 @@ public class LocomotiveAgent extends Agent {
     private boolean roadRequestSent = false;
 
     private Set<String> processedCargoIdsInComposition = new HashSet<>();
-
-    private class WagonRequest {
-        String cargoId;
-        String cargoType;
-        double weight;
-        String fromStation;
-        String toStation;
-        String wagonId;
-        double wagonCapacity;
-        Date wagonAvailableTime;
-        ACLMessage originalMessage;
-        long requestTime;
-        boolean isProcessed;
-        boolean isAccepted;
-
-        WagonRequest(String cargoId, String cargoType, double weight,
-                     String fromStation, String toStation, String wagonId,
-                     double wagonCapacity, Date wagonAvailableTime,
-                     ACLMessage originalMessage) {
-            this.cargoId = cargoId;
-            this.cargoType = cargoType;
-            this.weight = weight;
-            this.fromStation = fromStation;
-            this.toStation = toStation;
-            this.wagonId = wagonId;
-            this.wagonCapacity = wagonCapacity;
-            this.wagonAvailableTime = wagonAvailableTime;
-            this.originalMessage = originalMessage;
-            this.requestTime = System.currentTimeMillis();
-            this.isProcessed = false;
-            this.isAccepted = false;
-        }
-    }
-
-    private class WagonAcceptance {
-        String wagonId;
-        String cargoId;
-        String toStation;
-        long acceptanceTime;
-
-        WagonAcceptance(String wagonId, String cargoId, String toStation) {
-            this.wagonId = wagonId;
-            this.cargoId = cargoId;
-            this.toStation = toStation;
-            this.acceptanceTime = System.currentTimeMillis();
-        }
-    }
-
-    private class TrainComposition {
-        List<WagonRequest> wagons = new ArrayList<>();
-        String fromStation;
-        String toStation;
-        double totalWeight = 0;
-        Date earliestDepartureTime;
-        String locomotiveId;
-        boolean isConfirmed = false;
-        String compositionId;
-
-        Set<String> wagonIdsInComposition = new HashSet<>();
-        Set<String> cargoIdsInComposition = new HashSet<>();
-
-        TrainComposition(String fromStation, String toStation, String locomotiveId) {
-            this.fromStation = fromStation;
-            this.toStation = toStation;
-            this.locomotiveId = locomotiveId;
-            this.earliestDepartureTime = new Date(0);
-            this.compositionId = "COMP_" + System.currentTimeMillis() + "_" + locomotiveId;
-        }
-
-        boolean canAddWagon(WagonRequest request) {
-            if (wagonIdsInComposition.contains(request.wagonId)) {
-                return false;
-            }
-            if (cargoIdsInComposition.contains(request.cargoId)) {
-                return false;
-            }
-            if (!request.fromStation.equals(fromStation) ||
-                    !request.toStation.equals(toStation)) {
-                return false;
-            }
-            if (totalWeight + request.weight > locomotive.getMaxWeightCapacity()) {
-                return false;
-            }
-            return true;
-        }
-
-        void addWagon(WagonRequest request) {
-            if (canAddWagon(request)) {
-                wagons.add(request);
-                wagonIdsInComposition.add(request.wagonId);
-                cargoIdsInComposition.add(request.cargoId);
-                totalWeight += request.weight;
-
-                if (earliestDepartureTime.before(request.wagonAvailableTime)) {
-                    earliestDepartureTime = request.wagonAvailableTime;
-                }
-
-                request.isProcessed = true;
-                processedWagonRequests.add(request.wagonId + "_" + request.cargoId);
-
-                System.out.println("Wagon " + request.wagonId + " added to composition " +
-                        compositionId + " for cargo " + request.cargoId +
-                        ". Total wagons: " + wagons.size() + ", total weight: " + totalWeight);
-            } else {
-            }
-        }
-
-        String getCargoIds() {
-            StringBuilder sb = new StringBuilder();
-            for (WagonRequest wagon : wagons) {
-                if (sb.length() > 0) sb.append(",");
-                sb.append(wagon.cargoId);
-            }
-            return sb.toString();
-        }
-
-        String getWagonIds() {
-            StringBuilder sb = new StringBuilder();
-            for (WagonRequest wagon : wagons) {
-                if (sb.length() > 0) sb.append(",");
-                sb.append(wagon.wagonId);
-            }
-            return sb.toString();
-        }
-
-        boolean containsCargo(String cargoId) {
-            return cargoIdsInComposition.contains(cargoId);
-        }
-
-        WagonRequest getWagonByCargoId(String cargoId) {
-            for (WagonRequest wagon : wagons) {
-                if (wagon.cargoId.equals(cargoId)) {
-                    return wagon;
-                }
-            }
-            return null;
-        }
-
-        void markWagonAccepted(String wagonId) {
-            for (WagonRequest wagon : wagons) {
-                if (wagon.wagonId.equals(wagonId)) {
-                    wagon.isAccepted = true;
-                    break;
-                }
-            }
-        }
-
-        boolean allWagonsAccepted() {
-            for (WagonRequest wagon : wagons) {
-                if (!wagon.isAccepted) {
-                    return false;
-                }
-            }
-            return true;
-        }
-    }
 
     protected void setup() {
         agentId = (String) getArguments()[0];
@@ -230,7 +74,7 @@ public class LocomotiveAgent extends Agent {
         addBehaviour(new AcceptProposalBehaviour(this, 100));
         addBehaviour(new ScheduleFinalizedBehaviour(this, 100));
         addBehaviour(new RoadRejectionBehaviour(this, 100));
-        addBehaviour(new CompositionTimerBehaviour(this, 2000));
+        addBehaviour(new CompositionTimerBehaviour(this, 1000));
 
         System.out.println(agentId + " started with locomotive: " + locomotive.getId() +
                 " at station: " + locomotive.getCurrentStation());
@@ -785,5 +629,161 @@ public class LocomotiveAgent extends Agent {
             System.err.println(agentId + ": Error deregistering from DF: " + e.getMessage());
         }
         System.out.println(agentId + " terminated at station: " + locomotive.getCurrentStation());
+    }
+
+    private class WagonRequest {
+        String cargoId;
+        String cargoType;
+        double weight;
+        String fromStation;
+        String toStation;
+        String wagonId;
+        double wagonCapacity;
+        Date wagonAvailableTime;
+        ACLMessage originalMessage;
+        long requestTime;
+        boolean isProcessed;
+        boolean isAccepted;
+
+        WagonRequest(String cargoId, String cargoType, double weight,
+                     String fromStation, String toStation, String wagonId,
+                     double wagonCapacity, Date wagonAvailableTime,
+                     ACLMessage originalMessage) {
+            this.cargoId = cargoId;
+            this.cargoType = cargoType;
+            this.weight = weight;
+            this.fromStation = fromStation;
+            this.toStation = toStation;
+            this.wagonId = wagonId;
+            this.wagonCapacity = wagonCapacity;
+            this.wagonAvailableTime = wagonAvailableTime;
+            this.originalMessage = originalMessage;
+            this.requestTime = System.currentTimeMillis();
+            this.isProcessed = false;
+            this.isAccepted = false;
+        }
+    }
+
+    private class WagonAcceptance {
+        String wagonId;
+        String cargoId;
+        String toStation;
+        long acceptanceTime;
+
+        WagonAcceptance(String wagonId, String cargoId, String toStation) {
+            this.wagonId = wagonId;
+            this.cargoId = cargoId;
+            this.toStation = toStation;
+            this.acceptanceTime = System.currentTimeMillis();
+        }
+    }
+
+    private class TrainComposition {
+        List<WagonRequest> wagons = new ArrayList<>();
+        String fromStation;
+        String toStation;
+        double totalWeight = 0;
+        Date earliestDepartureTime;
+        String locomotiveId;
+        boolean isConfirmed = false;
+        String compositionId;
+
+        Set<String> wagonIdsInComposition = new HashSet<>();
+        Set<String> cargoIdsInComposition = new HashSet<>();
+
+        TrainComposition(String fromStation, String toStation, String locomotiveId) {
+            this.fromStation = fromStation;
+            this.toStation = toStation;
+            this.locomotiveId = locomotiveId;
+            this.earliestDepartureTime = new Date(0);
+            this.compositionId = "COMP_" + System.currentTimeMillis() + "_" + locomotiveId;
+        }
+
+        boolean canAddWagon(WagonRequest request) {
+            if (wagonIdsInComposition.contains(request.wagonId)) {
+                return false;
+            }
+            if (cargoIdsInComposition.contains(request.cargoId)) {
+                return false;
+            }
+            if (!request.fromStation.equals(fromStation) ||
+                    !request.toStation.equals(toStation)) {
+                return false;
+            }
+            if (totalWeight + request.weight > locomotive.getMaxWeightCapacity()) {
+                return false;
+            }
+            return true;
+        }
+
+        void addWagon(WagonRequest request) {
+            if (canAddWagon(request)) {
+                wagons.add(request);
+                wagonIdsInComposition.add(request.wagonId);
+                cargoIdsInComposition.add(request.cargoId);
+                totalWeight += request.weight;
+
+                if (earliestDepartureTime.before(request.wagonAvailableTime)) {
+                    earliestDepartureTime = request.wagonAvailableTime;
+                }
+
+                request.isProcessed = true;
+                processedWagonRequests.add(request.wagonId + "_" + request.cargoId);
+
+                System.out.println("Wagon " + request.wagonId + " added to composition " +
+                        compositionId + " for cargo " + request.cargoId +
+                        ". Total wagons: " + wagons.size() + ", total weight: " + totalWeight);
+            } else {
+            }
+        }
+
+        String getCargoIds() {
+            StringBuilder sb = new StringBuilder();
+            for (WagonRequest wagon : wagons) {
+                if (sb.length() > 0) sb.append(",");
+                sb.append(wagon.cargoId);
+            }
+            return sb.toString();
+        }
+
+        String getWagonIds() {
+            StringBuilder sb = new StringBuilder();
+            for (WagonRequest wagon : wagons) {
+                if (sb.length() > 0) sb.append(",");
+                sb.append(wagon.wagonId);
+            }
+            return sb.toString();
+        }
+
+        boolean containsCargo(String cargoId) {
+            return cargoIdsInComposition.contains(cargoId);
+        }
+
+        WagonRequest getWagonByCargoId(String cargoId) {
+            for (WagonRequest wagon : wagons) {
+                if (wagon.cargoId.equals(cargoId)) {
+                    return wagon;
+                }
+            }
+            return null;
+        }
+
+        void markWagonAccepted(String wagonId) {
+            for (WagonRequest wagon : wagons) {
+                if (wagon.wagonId.equals(wagonId)) {
+                    wagon.isAccepted = true;
+                    break;
+                }
+            }
+        }
+
+        boolean allWagonsAccepted() {
+            for (WagonRequest wagon : wagons) {
+                if (!wagon.isAccepted) {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 }

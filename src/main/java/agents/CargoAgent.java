@@ -52,7 +52,7 @@ public class CargoAgent extends Agent {
         System.out.println(agentId + " started with cargo: " + cargo.getId() +
                 " at station: " + cargo.getFromStation());
 
-        addBehaviour(new RequestWagonsBehaviour(this, 4000));
+        addBehaviour(new RequestWagonsBehaviour(this, 3000));
         addBehaviour(new WaitForWagonResponsesBehaviour(this, 100));
         addBehaviour(new ScheduleConfirmationBehaviour(this, 100));
     }

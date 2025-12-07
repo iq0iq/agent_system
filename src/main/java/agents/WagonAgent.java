@@ -30,7 +30,7 @@ public class WagonAgent extends Agent {
     private long startTime;
 
     private Map<String, CargoRequest> pendingRequests = new HashMap<>();
-    private final long RETRY_INTERVAL = 4000;
+    private final long RETRY_INTERVAL = 2000;
     private final int MAX_RETRIES = 3;
 
     private class CargoRequest {
@@ -95,7 +95,7 @@ public class WagonAgent extends Agent {
         addBehaviour(new CargoRequestBehaviour(this, 100));
         addBehaviour(new WaitForLocomotiveResponsesBehaviour(this, 100));
         addBehaviour(new AcceptProposalBehaviour(this, 100));
-        addBehaviour(new RetryManagerBehaviour(this, 10000));
+        addBehaviour(new RetryManagerBehaviour(this, 5000));
 
         System.out.println(agentId + " started with wagon: " + wagon.getId() +
                 " at station: " + wagon.getCurrentStation());
