@@ -30,8 +30,8 @@ public class LocomotiveAgent extends Agent {
     private Map<String, WagonRequest> pendingWagonRequests = new HashMap<>();
     private TrainComposition currentComposition = null;
     private boolean isProcessingComposition = false;
-    private final long COMPOSITION_TIMEOUT = 7500;
-    private final long WAGON_ACCEPT_TIMEOUT = 5000;
+    private final long COMPOSITION_TIMEOUT = 5000;
+    private final long WAGON_ACCEPT_TIMEOUT = 15000;
 
     private boolean isCollectingWagons = false;
     private long compositionStartTime = 0;
@@ -110,6 +110,11 @@ public class LocomotiveAgent extends Agent {
 
             String requestKey = wagonId + "_" + cargoId;
 
+            if (isProcessingComposition || roadRequestSent || currentComposition != null) {
+                sendRefusal(msg, cargoId, "COMPOSITION_IN_PROGRESS");
+                return;
+            }
+
             if (currentComposition != null && currentComposition.containsCargo(cargoId)) {
                 ACLMessage reply = msg.createReply();
                 reply.setPerformative(ACLMessage.PROPOSE);
@@ -117,6 +122,7 @@ public class LocomotiveAgent extends Agent {
                 myAgent.send(reply);
                 return;
             }
+
             WagonRequest request = new WagonRequest(cargoId, cargoType, weight, fromStation,
                     toStation, wagonId, wagonCapacity, wagonAvailableTime, msg);
 
@@ -345,6 +351,12 @@ public class LocomotiveAgent extends Agent {
                     roadProposals.clear();
                     roadAgentsContacted.clear();
                     expectedRoadResponses = 0;
+                    if (currentComposition != null && !currentComposition.wagons.isEmpty()) {
+                        waitingForWagonAcceptances = true;
+                        wagonAcceptStartTime = System.currentTimeMillis();
+                        System.out.println(agentId + ": Waiting for wagon acceptances (timeout: " +
+                                WAGON_ACCEPT_TIMEOUT + "ms) — started immediately after proposals sent");
+                    }
                 } else {
                     System.out.println(agentId + ": No suitable road found!");
                     sendRefusalsToWagons("NO_SUITABLE_ROAD");
@@ -379,6 +391,10 @@ public class LocomotiveAgent extends Agent {
                     }
 
                     if (wagonRequest != null) {
+                        if (acceptedWagons.containsKey(wagonRequest.wagonId)) {
+                            System.out.println(agentId + ": Duplicate ACCEPT_PROPOSAL for wagon " + wagonRequest.wagonId);
+                            return;
+                        }
                         acceptedWagons.put(wagonRequest.wagonId, new WagonAcceptance(wagonRequest.wagonId, cargoId, toStation));
                         currentComposition.markWagonAccepted(wagonRequest.wagonId);
 
@@ -390,18 +406,19 @@ public class LocomotiveAgent extends Agent {
                                 ". Accepted wagons: " + acceptedWagons.size() +
                                 "/" + (currentComposition != null ? currentComposition.wagons.size() : 0));
 
-                        if (!waitingForWagonAcceptances && acceptedWagons.size() == 1) {
-                            waitingForWagonAcceptances = true;
-                            wagonAcceptStartTime = System.currentTimeMillis();
-                            System.out.println(agentId + ": Waiting for other wagons to accept (timeout: " +
-                                    WAGON_ACCEPT_TIMEOUT + "ms)");
-                        }
-
                         checkAndSendRoadAcceptance();
                     } else {
                         System.out.println(agentId + ": Received ACCEPT_PROPOSAL for cargo " +
                                 cargoId + " but no matching wagon in current composition");
                     }
+                }
+            }
+            if (waitingForWagonAcceptances && currentComposition != null) {
+                long currentTime = System.currentTimeMillis();
+                if (currentTime - wagonAcceptStartTime > WAGON_ACCEPT_TIMEOUT) {
+                    System.out.println(agentId + ": Wagon acceptance timeout reached (no responses)");
+                    sendRoadAcceptance();
+                    waitingForWagonAcceptances = false;
                 }
             }
         }
@@ -602,6 +619,7 @@ public class LocomotiveAgent extends Agent {
         }
         roadProposals.clear();
         roadAgentsContacted.clear();
+        processedWagonRequests.clear();
         expectedRoadResponses = 0;
         bestRoadProposal = null;
         currentComposition = null;

@@ -1,57 +1,46 @@
 [
   {
-    "toStation": "ST3",
-    "departureTime": "Jan 1, 2025, 8:00:00 AM",
-    "locomotiveId": "L2",
-    "cargoIds": "C2,C5",
-    "roadAgent": "RoadAgent2",
-    "wagonIds": "W2,W4",
-    "arrivalTime": "Jan 1, 2025, 2:40:00 PM",
-    "scheduleId": "SCHEDULE_1765099776333_L2_81880910",
-    "fromStation": "ST2"
-  },
-  {
     "toStation": "ST2",
     "departureTime": "Jan 1, 2025, 8:00:00 AM",
     "locomotiveId": "L1",
-    "cargoIds": "C1,C3,C8",
+    "cargoIds": "C7,C3",
     "roadAgent": "RoadAgent1",
-    "wagonIds": "W1,W3,W5",
+    "wagonIds": "W1,W3",
     "arrivalTime": "Jan 1, 2025, 4:08:00 PM",
-    "scheduleId": "SCHEDULE_1765099776511_L1_-1114722756",
+    "scheduleId": "SCHEDULE_1765298616439_L1_81851118",
     "fromStation": "ST1"
   },
   {
-    "toStation": "ST2",
-    "departureTime": "Jan 1, 2025, 2:40:00 PM",
-    "locomotiveId": "L2",
-    "cargoIds": "C4",
-    "roadAgent": "RoadAgent4",
-    "wagonIds": "W4",
-    "arrivalTime": "Jan 1, 2025, 9:40:00 PM",
-    "scheduleId": "SCHEDULE_1765099785054_L2_2749",
-    "fromStation": "ST3"
-  },
-  {
-    "toStation": "ST4",
+    "toStation": "ST3",
     "departureTime": "Jan 1, 2025, 4:08:00 PM",
     "locomotiveId": "L1",
-    "cargoIds": "C7,C6",
-    "roadAgent": "RoadAgent5",
-    "wagonIds": "W1,W3",
-    "arrivalTime": "Jan 1, 2025, 5:23:00 PM",
-    "scheduleId": "SCHEDULE_1765099785229_L1_81851118",
+    "cargoIds": "C2,C5",
+    "roadAgent": "RoadAgent2",
+    "wagonIds": "W2,W4",
+    "arrivalTime": "Jan 1, 2025, 9:08:00 PM",
+    "scheduleId": "SCHEDULE_1765298622881_L1_81880910",
     "fromStation": "ST2"
   },
   {
-    "toStation": "ST5",
-    "departureTime": "Jan 1, 2025, 5:23:00 PM",
+    "toStation": "ST2",
+    "departureTime": "Jan 1, 2025, 9:08:00 PM",
     "locomotiveId": "L1",
-    "cargoIds": "C10,C9",
-    "roadAgent": "RoadAgent6",
-    "wagonIds": "W1,W6",
-    "arrivalTime": "Jan 2, 2025, 4:38:00 AM",
-    "scheduleId": "SCHEDULE_1765099794346_L1_81851121",
-    "fromStation": "ST4"
+    "cargoIds": "C4",
+    "roadAgent": "RoadAgent4",
+    "wagonIds": "W4",
+    "arrivalTime": "Jan 2, 2025, 2:23:00 AM",
+    "scheduleId": "SCHEDULE_1765298631779_L1_2749",
+    "fromStation": "ST3"
+  },
+  {
+    "toStation": "ST2",
+    "departureTime": "Jan 1, 2025, 4:08:00 PM",
+    "locomotiveId": "L2",
+    "cargoIds": "C8",
+    "roadAgent": "RoadAgent1",
+    "wagonIds": "W5",
+    "arrivalTime": "Jan 2, 2025, 2:58:00 AM",
+    "scheduleId": "SCHEDULE_1765298637743_L2_2750",
+    "fromStation": "ST1"
   }
 ]

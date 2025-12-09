@@ -2,267 +2,43 @@
   "simulationStartTime": "2025-01-01 08:00:00",
   "agents": {
     "cargo": [
-      {
-        "agentId": "CargoAgent1",
-        "cargo": {
-          "id": "C1",
-          "type": "bulk",
-          "weight": 50.0,
-          "fromStation": "ST1",
-          "toStation": "ST2"
-        }
-      },
-      {
-        "agentId": "CargoAgent2",
-        "cargo": {
-          "id": "C2",
-          "type": "liquid",
-          "weight": 30.0,
-          "fromStation": "ST2",
-          "toStation": "ST3"
-        }
-      },
-      {
-        "agentId": "CargoAgent3",
-        "cargo": {
-          "id": "C3",
-          "type": "bulk",
-          "weight": 40.0,
-          "fromStation": "ST1",
-          "toStation": "ST2"
-        }
-      },
-      {
-        "agentId": "CargoAgent4",
-        "cargo": {
-          "id": "C4",
-          "type": "liquid",
-          "weight": 40.0,
-          "fromStation": "ST3",
-          "toStation": "ST2"
-        }
-      },
-      {
-        "agentId": "CargoAgent5",
-        "cargo": {
-          "id": "C5",
-          "type": "liquid",
-          "weight": 30.0,
-          "fromStation": "ST2",
-          "toStation": "ST3"
-        }
-      },
-      {
-        "agentId": "CargoAgent6",
-        "cargo": {
-          "id": "C6",
-          "type": "bulk",
-          "weight": 10.0,
-          "fromStation": "ST2",
-          "toStation": "ST4"
-        }
-      },
-      {
-        "agentId": "CargoAgent7",
-        "cargo": {
-          "id": "C7",
-          "type": "bulk",
-          "weight": 30.0,
-          "fromStation": "ST2",
-          "toStation": "ST4"
-        }
-      },
-      {
-        "agentId": "CargoAgent8",
-        "cargo": {
-          "id": "C8",
-          "type": "water",
-          "weight": 50.0,
-          "fromStation": "ST1",
-          "toStation": "ST2"
-        }
-      },
-      {
-        "agentId": "CargoAgent9",
-        "cargo": {
-          "id": "C9",
-          "type": "container",
-          "weight": 20.0,
-          "fromStation": "ST4",
-          "toStation": "ST5"
-        }
-      },
-      {
-        "agentId": "CargoAgent10",
-        "cargo": {
-          "id": "C10",
-          "type": "bulk",
-          "weight": 15.0,
-          "fromStation": "ST4",
-          "toStation": "ST5"
-        }
-      }
+      {"agentId":"CargoAgent1","cargo":{"id":"C1","type":"bulk","weight":50,"fromStation":"ST1","toStation":"ST2"}},
+      {"agentId":"CargoAgent2","cargo":{"id":"C2","type":"liquid","weight":30,"fromStation":"ST2","toStation":"ST3"}},
+      {"agentId":"CargoAgent3","cargo":{"id":"C3","type":"bulk","weight":40,"fromStation":"ST1","toStation":"ST2"}},
+      {"agentId":"CargoAgent4","cargo":{"id":"C4","type":"liquid","weight":40,"fromStation":"ST3","toStation":"ST2"}},
+      {"agentId":"CargoAgent5","cargo":{"id":"C5","type":"liquid","weight":30,"fromStation":"ST2","toStation":"ST3"}},
+      {"agentId":"CargoAgent6","cargo":{"id":"C6","type":"bulk","weight":10,"fromStation":"ST1","toStation":"ST2"}},
+      {"agentId":"CargoAgent7","cargo":{"id":"C7","type":"bulk","weight":30,"fromStation":"ST1","toStation":"ST2"}},
+      {"agentId":"CargoAgent8","cargo":{"id":"C8","type":"water","weight":50,"fromStation":"ST1","toStation":"ST2"}},
+      {"agentId":"CargoAgent9","cargo":{"id":"C9","type":"container","weight":20,"fromStation":"ST3","toStation":"ST5"}},
+      {"agentId":"CargoAgent10","cargo":{"id":"C10","type":"bulk","weight":15,"fromStation":"ST3","toStation":"ST5"}}
     ],
     "wagon": [
-      {
-        "agentId": "WagonAgent1",
-        "wagon": {
-          "id": "W1",
-          "type": "bulk",
-          "capacity": 60.0,
-          "currentStation": "ST1",
-          "compatibleCargoTypes": ["bulk", "granular"]
-        }
-      },
-      {
-        "agentId": "WagonAgent2",
-        "wagon": {
-          "id": "W2",
-          "type": "tank",
-          "capacity": 40.0,
-          "currentStation": "ST2",
-          "compatibleCargoTypes": ["liquid", "gas"]
-        }
-      },
-      {
-        "agentId": "WagonAgent3",
-        "wagon": {
-          "id": "W3",
-          "type": "bulk",
-          "capacity": 60.0,
-          "currentStation": "ST1",
-          "compatibleCargoTypes": ["bulk", "granular"]
-        }
-      },
-      {
-        "agentId": "WagonAgent4",
-        "wagon": {
-          "id": "W4",
-          "type": "tank",
-          "capacity": 40.0,
-          "currentStation": "ST2",
-          "compatibleCargoTypes": ["liquid", "gas"]
-        }
-      },
-      {
-        "agentId": "WagonAgent5",
-        "wagon": {
-          "id": "W5",
-          "type": "water",
-          "capacity": 60.0,
-          "currentStation": "ST1",
-          "compatibleCargoTypes": ["water"]
-        }
-      },
-      {
-        "agentId": "WagonAgent6",
-        "wagon": {
-          "id": "W6",
-          "type": "flatcar",
-          "capacity": 30.0,
-          "currentStation": "ST4",
-          "compatibleCargoTypes": ["container", "refrigerated"]
-        }
-      }
+      {"agentId":"WagonAgent1","wagon":{"id":"W1","type":"bulk","capacity":60,"currentStation":"ST1","compatibleCargoTypes":["bulk","granular"]}},
+      {"agentId":"WagonAgent2","wagon":{"id":"W2","type":"tank","capacity":40,"currentStation":"ST2","compatibleCargoTypes":["liquid","gas"]}},
+      {"agentId":"WagonAgent3","wagon":{"id":"W3","type":"bulk","capacity":60,"currentStation":"ST1","compatibleCargoTypes":["bulk","granular"]}},
+      {"agentId":"WagonAgent4","wagon":{"id":"W4","type":"tank","capacity":40,"currentStation":"ST2","compatibleCargoTypes":["liquid","gas"]}},
+      {"agentId":"WagonAgent5","wagon":{"id":"W5","type":"water","capacity":60,"currentStation":"ST1","compatibleCargoTypes":["water"]}},
+      {"agentId":"WagonAgent6","wagon":{"id":"W6","type":"flatcar","capacity":30,"currentStation":"ST4","compatibleCargoTypes":["container","refrigerated"]}}
     ],
     "locomotive": [
-      {
-        "agentId": "LocomotiveAgent1",
-        "locomotive": {
-          "id": "L1",
-          "type": "electric",
-          "currentStation": "ST1",
-          "maxWeightCapacity": 200.0,
-          "speed": 80.0
-        }
-      },
-      {
-        "agentId": "LocomotiveAgent2",
-        "locomotive": {
-          "id": "L2",
-          "type": "diesel",
-          "currentStation": "ST2",
-          "maxWeightCapacity": 150.0,
-          "speed": 60.0
-        }
-      }
+      {"agentId":"LocomotiveAgent1","locomotive":{"id":"L1","type":"electric","currentStation":"ST1","maxWeightCapacity":80,"speed":80}},
+      {"agentId":"LocomotiveAgent2","locomotive":{"id":"L2","type":"diesel","currentStation":"ST1","maxWeightCapacity":80,"speed":60}}
     ],
     "road": [
-      {
-        "agentId": "RoadAgent1",
-        "route": {
-          "fromStation": "ST1",
-          "toStation": "ST2",
-          "distance": 650.0
-        }
-      },
-      {
-        "agentId": "RoadAgent2",
-        "route": {
-          "fromStation": "ST2",
-          "toStation": "ST3",
-          "distance": 400.0
-        }
-      },
-      {
-        "agentId": "RoadAgent3",
-        "route": {
-          "fromStation": "ST1",
-          "toStation": "ST3",
-          "distance": 420.0
-        }
-      },
-      {
-        "agentId": "RoadAgent4",
-        "route": {
-          "fromStation": "ST3",
-          "toStation": "ST2",
-          "distance": 420.0
-        }
-      },
-      {
-        "agentId": "RoadAgent5",
-        "route": {
-          "fromStation": "ST2",
-          "toStation": "ST4",
-          "distance": 100.0
-        }
-      },
-      {
-        "agentId": "RoadAgent6",
-        "route": {
-          "fromStation": "ST4",
-          "toStation": "ST5",
-          "distance": 900.0
-        }
-      }
+      {"agentId":"RoadAgent1","route":{"fromStation":"ST1","toStation":"ST2","distance":650}},
+      {"agentId":"RoadAgent2","route":{"fromStation":"ST2","toStation":"ST3","distance":400}},
+      {"agentId":"RoadAgent3","route":{"fromStation":"ST1","toStation":"ST3","distance":420}},
+      {"agentId":"RoadAgent4","route":{"fromStation":"ST3","toStation":"ST2","distance":420}},
+      {"agentId":"RoadAgent5","route":{"fromStation":"ST2","toStation":"ST4","distance":100}},
+      {"agentId":"RoadAgent6","route":{"fromStation":"ST3","toStation":"ST5","distance":900}}
     ]
   },
   "stations": [
-    {
-      "id": "ST1",
-      "name": "Moscow",
-      "location": "MSK"
-    },
-    {
-      "id": "ST2",
-      "name": "Saint Petersburg",
-      "location": "SPB"
-    },
-    {
-      "id": "ST3",
-      "name": "Nizhny Novgorod",
-      "location": "NN"
-    },
-    {
-      "id": "ST4",
-      "name": "Ufa",
-      "location": "UFA"
-    },
-    {
-      "id": "ST5",
-      "name": "Kazan",
-      "location": "KZ"
-    }
+    {"id":"ST1","name":"Moscow","location":"MSK"},
+    {"id":"ST2","name":"Saint Petersburg","location":"SPB"},
+    {"id":"ST3","name":"Nizhny Novgorod","location":"NN"},
+    {"id":"ST4","name":"Ufa","location":"UFA"},
+    {"id":"ST5","name":"Kazan","location":"KZ"}
   ]
 }
