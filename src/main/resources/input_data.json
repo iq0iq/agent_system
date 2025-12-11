@@ -33,12 +33,5 @@
       {"agentId":"RoadAgent5","route":{"fromStation":"ST2","toStation":"ST4","distance":100}},
       {"agentId":"RoadAgent6","route":{"fromStation":"ST3","toStation":"ST5","distance":900}}
     ]
-  },
-  "stations": [
-    {"id":"ST1","name":"Moscow","location":"MSK"},
-    {"id":"ST2","name":"Saint Petersburg","location":"SPB"},
-    {"id":"ST3","name":"Nizhny Novgorod","location":"NN"},
-    {"id":"ST4","name":"Ufa","location":"UFA"},
-    {"id":"ST5","name":"Kazan","location":"KZ"}
-  ]
+  }
 }
